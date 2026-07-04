@@ -1532,8 +1532,14 @@ function cloudConfigured(){
 function normalizeAppsScriptUrl(value=""){
   let text = String(value || "").trim();
   if(!text) return "";
+  // Aceita colar só o código da implantação: AKfy...
   if(/^AKfy[a-zA-Z0-9_-]+$/.test(text)){
     return `https://script.google.com/macros/s/${text}/exec`;
+  }
+  // Aceita colar algo incompleto como /macros/s/AKfy.../exec ou macros/s/AKfy...
+  const macroMatch = text.match(/macros\/s\/(AKfy[a-zA-Z0-9_-]+)/);
+  if(macroMatch && !text.includes("script.google.com")){
+    return `https://script.google.com/macros/s/${macroMatch[1]}/exec`;
   }
   if(text.includes("script.google.com") && !text.startsWith("http")){
     text = "https://" + text.replace(/^\/+/, "");
@@ -1590,6 +1596,48 @@ function sanitizeDataForCloud(source){
   delete clone.settings.apiKey;
   return clone;
 }
+function jsonpCloudRequest(url, action, token, payload={}){
+  return new Promise((resolve, reject) => {
+    const callbackName = `centralViagemCb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const cleanup = () => {
+      try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
+      if(script.parentNode) script.parentNode.removeChild(script);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("Tempo esgotado ao testar Apps Script. Confira se a implantação está como App da Web e acesso Qualquer pessoa."));
+    }, 20000);
+    window[callbackName] = json => {
+      clearTimeout(timer);
+      cleanup();
+      if(!json || json.ok === false) reject(new Error((json && json.error) || "Erro desconhecido no Apps Script."));
+      else resolve(json);
+    };
+    const params = new URLSearchParams();
+    params.set("action", action);
+    params.set("token", token);
+    params.set("callback", callbackName);
+    if(payload && Object.keys(payload).length) params.set("payload", JSON.stringify(payload));
+    script.onerror = () => {
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error("Não foi possível carregar o Apps Script. Confira a URL /exec e a permissão 'Qualquer pessoa'."));
+    };
+    script.src = `${url}${url.includes("?") ? "&" : "?"}${params.toString()}`;
+    document.head.appendChild(script);
+  });
+}
+
+async function postCloudNoCors(url, action, token, payload={}){
+  const body = new URLSearchParams();
+  body.set("action", action);
+  body.set("token", token);
+  body.set("payload", JSON.stringify(payload || {}));
+  await fetch(url, { method:"POST", mode:"no-cors", body });
+  return { ok:true, message:"Solicitação enviada ao Apps Script. Confira a Planilha Google para validar a gravação." };
+}
+
 async function cloudRequest(action, payload={}){
   ensureV6Defaults();
   readSettingsFromPanelSilently();
@@ -1597,16 +1645,30 @@ async function cloudRequest(action, payload={}){
   const token = (data.settings.apiKey || "").trim();
   if(!url) throw new Error("Cole a URL /exec do Apps Script em Configurações.");
   if(!token) throw new Error("Preencha a chave de edição em Configurações.");
-  const body = new URLSearchParams();
-  body.set("action", action);
-  body.set("token", token);
-  body.set("payload", JSON.stringify(payload || {}));
-  const res = await fetch(url, { method:"POST", body });
-  const text = await res.text();
-  let json;
-  try{ json = JSON.parse(text); }catch(err){ throw new Error("Resposta não era JSON. Verifique se a URL termina em /exec e se o Web App foi implantado corretamente."); }
-  if(!json.ok) throw new Error(json.error || "Erro desconhecido no Apps Script.");
-  return json;
+
+  // Apps Script não libera CORS de forma confiável para fetch comum no GitHub Pages.
+  // Para ações de leitura/teste usamos JSONP. Para gravações longas, enviamos via no-cors.
+  if(action === "ping" || action === "getAll"){
+    return await jsonpCloudRequest(url, action, token, payload);
+  }
+
+  try{
+    const body = new URLSearchParams();
+    body.set("action", action);
+    body.set("token", token);
+    body.set("payload", JSON.stringify(payload || {}));
+    const res = await fetch(url, { method:"POST", body });
+    const text = await res.text();
+    let json;
+    try{ json = JSON.parse(text); }catch(err){ throw new Error("Resposta não era JSON. Verifique se a URL termina em /exec e se o Web App foi implantado corretamente."); }
+    if(!json.ok) throw new Error(json.error || "Erro desconhecido no Apps Script.");
+    return json;
+  }catch(err){
+    if(String(err && err.message || err).includes("NetworkError") || String(err && err.message || err).includes("Failed to fetch") || String(err && err.message || err).includes("CORS")){
+      return await postCloudNoCors(url, action, token, payload);
+    }
+    throw err;
+  }
 }
 async function testCloudConnection(){
   try{

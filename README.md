@@ -1,22 +1,42 @@
-# Central de Viagem — v6.3 Configurações simples
+# Central de Viagem — v6.4 CORS/JSONP
 
-Versão com a página de Configurações simplificada para reduzir confusão entre:
+Versão focada em corrigir o erro de conexão:
 
-- URL do Apps Script `/exec`;
-- chave de edição `API_KEY`;
-- pasta do Google Drive;
-- agenda compartilhada opcional;
-- backup avançado.
+`NetworkError when attempting to fetch resource.`
 
 ## O que mudou
 
-- Configuração principal agora tem apenas 3 campos: Apps Script, chave e Drive.
-- Botões principais ficam no mesmo card: Salvar ajustes, Testar conexão, Salvar na nuvem e Carregar da nuvem.
-- Agenda compartilhada virou seção opcional recolhida.
-- Backup e instruções técnicas viraram seção avançada recolhida.
-- O sistema tenta completar a URL se você colar só o código `AKfy...`.
-- O botão Testar conexão agora lê os campos preenchidos na tela antes de testar.
+- O teste de conexão com Apps Script passou a usar JSONP, evitando bloqueio CORS no GitHub Pages.
+- O `google-apps-script/Code.gs` também foi atualizado para responder JSONP quando receber `callback`.
+- O campo de URL ficou mais tolerante: aceita link completo, código `AKfy...` ou trecho `/macros/s/AKfy...`.
+- A gravação continua usando Apps Script; se o navegador bloquear a leitura da resposta por CORS, a plataforma envia a solicitação e orienta conferir a planilha.
 
-## Subida no GitHub
+## Importante
 
-Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
+Depois de subir esta versão no GitHub, você também precisa atualizar o código no Apps Script:
+
+1. Abra o Apps Script.
+2. Substitua o conteúdo do `Código.gs` pelo arquivo `google-apps-script/Code.gs` desta versão.
+3. Troque `API_KEY` para a sua chave.
+4. Salve.
+5. Vá em `Implantar → Gerenciar implantações → Editar → Nova versão → Implantar`.
+
+## Campos da plataforma
+
+URL do Apps Script:
+
+```text
+https://script.google.com/macros/s/SEU_CODIGO/exec
+```
+
+Chave de edição:
+
+```text
+A mesma API_KEY do Código.gs
+```
+
+Pasta do Drive:
+
+```text
+ID da pasta do Drive da viagem
+```

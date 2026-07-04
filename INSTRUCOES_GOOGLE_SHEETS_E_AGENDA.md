@@ -105,3 +105,20 @@ Na Central de Viagem:
 - O Google Drive guarda documentos enviados.
 - O Google Agenda recebe eventos importantes.
 - Arquivos grandes podem demorar ou falhar no envio pelo Apps Script; para arquivos pesados, o mais seguro é subir manualmente no Drive e colar o link no documento.
+
+
+## Correção v6.4 — erro NetworkError/CORS
+
+Se ao clicar em **Testar conexão** aparecer `NetworkError when attempting to fetch resource`, atualize também o arquivo `Código.gs` no Apps Script com a versão v6.4. Esta versão adiciona suporte a JSONP, que permite o GitHub Pages testar e carregar dados do Apps Script sem bloqueio CORS.
+
+Depois de colar o novo `Código.gs`, mantenha sua chave:
+
+```javascript
+const API_KEY = 'mendoza-2026-elton-familia';
+```
+
+Em seguida salve e atualize a implantação:
+
+```text
+Implantar → Gerenciar implantações → Editar → Nova versão → Implantar
+```

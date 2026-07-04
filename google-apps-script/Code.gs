@@ -1,7 +1,7 @@
 
 /**
  * Central de Viagem — Backend Google Sheets + Drive + Agenda
- * Versão v6
+ * Versão v6.4 — JSONP/CORS fix
  *
  * Como usar:
  * 1) Crie uma Planilha Google chamada "Central de Viagem".
@@ -39,23 +39,24 @@ function doPost(e) {
 }
 
 function handleRequest_(e, method) {
+  const params = (e && e.parameter) || {};
+  const callback = params.callback || '';
   try {
-    const params = (e && e.parameter) || {};
     const action = params.action || 'ping';
     const token = params.token || '';
     if (token !== API_KEY) throw new Error('Chave de edição inválida. Confira API_KEY no Code.gs e na Central.');
     const payload = params.payload ? JSON.parse(params.payload) : {};
 
-    if (action === 'ping') return json_({ ok: true, message: 'Conexão OK com Apps Script', method });
-    if (action === 'setup') return json_(setupCentralViagem(payload.data));
-    if (action === 'saveAll') return json_(saveAll_(payload.data, payload.settings || {}));
-    if (action === 'getAll') return json_({ ok: true, data: readAll_() });
-    if (action === 'createCalendarEvent') return json_(createCalendarEvent_(payload.event, payload.settings || {}, payload.trip || {}));
-    if (action === 'uploadFile') return json_(uploadFile_(payload));
+    if (action === 'ping') return json_({ ok: true, message: 'Conexão OK com Apps Script', method }, callback);
+    if (action === 'setup') return json_(setupCentralViagem(payload.data), callback);
+    if (action === 'saveAll') return json_(saveAll_(payload.data, payload.settings || {}), callback);
+    if (action === 'getAll') return json_({ ok: true, data: readAll_() }, callback);
+    if (action === 'createCalendarEvent') return json_(createCalendarEvent_(payload.event, payload.settings || {}, payload.trip || {}), callback);
+    if (action === 'uploadFile') return json_(uploadFile_(payload), callback);
 
     throw new Error('Ação não reconhecida: ' + action);
   } catch (err) {
-    return json_({ ok: false, error: err.message || String(err) });
+    return json_({ ok: false, error: err.message || String(err) }, callback);
   }
 }
 
@@ -215,8 +216,14 @@ function log_(action, detail) {
   const sh = ensureSheet_(SHEETS.log, ['quando','acao','detalhe']);
   sh.appendRow([new Date(), action, detail || '']);
 }
-function json_(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+function json_(obj, callback) {
+  const text = JSON.stringify(obj);
+  if (callback && /^[a-zA-Z_$][\w$]*(\.[a-zA-Z_$][\w$]*)*$/.test(callback)) {
+    return ContentService
+      .createTextOutput(callback + '(' + text + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);
 }
 function parseTripDate_(value, year) {
   if (!value) return null;

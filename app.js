@@ -1525,7 +1525,47 @@ function ensureV6Defaults(){
   data.settings.driveFolderId = data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || "") || "";
 }
 function cloudConfigured(){
-  return data.settings.syncMode === "sheets" && Boolean(data.settings.appsScriptUrl && data.settings.apiKey);
+  const url = (data.settings.appsScriptUrl || "").trim();
+  const key = (data.settings.apiKey || "").trim();
+  return Boolean(url && key && data.settings.syncMode === "sheets");
+}
+function normalizeAppsScriptUrl(value=""){
+  let text = String(value || "").trim();
+  if(!text) return "";
+  if(/^AKfy[a-zA-Z0-9_-]+$/.test(text)){
+    return `https://script.google.com/macros/s/${text}/exec`;
+  }
+  if(text.includes("script.google.com") && !text.startsWith("http")){
+    text = "https://" + text.replace(/^\/+/, "");
+  }
+  if(text.includes("/macros/s/") && !text.endsWith("/exec")){
+    text = text.replace(/\/+$/, "") + "/exec";
+  }
+  return text;
+}
+function readSettingsFromPanelSilently(){
+  ensureV6Defaults();
+  if(!byId("settingAppsScriptUrl")) return;
+  const rawUrl = byId("settingAppsScriptUrl")?.value || "";
+  data.settings.appsScriptUrl = normalizeAppsScriptUrl(rawUrl);
+  if(byId("settingAppsScriptUrl") && byId("settingAppsScriptUrl").value !== data.settings.appsScriptUrl){
+    byId("settingAppsScriptUrl").value = data.settings.appsScriptUrl;
+  }
+  data.settings.apiKey = byId("settingApiKey")?.value.trim() || "";
+  const selectedMode = byId("settingSyncMode")?.value || "sheets";
+  data.settings.syncMode = selectedMode;
+  data.settings.autoSync = Boolean(byId("settingAutoSync")?.checked);
+  data.settings.driveFolderUrl = byId("settingDriveFolderUrl")?.value.trim() || "";
+  if(data.settings.driveFolderUrl.includes("script.google.com")){
+    // Evita gravar URL do Apps Script como pasta do Drive.
+    data.settings.driveFolderUrl = "";
+  }
+  data.settings.driveFolderId = byId("settingDriveFolderId")?.value.trim() || extractDriveFolderId(data.settings.driveFolderUrl || "") || "";
+  data.settings.googleCalendarName = byId("settingGoogleCalendarName")?.value.trim() || data.settings.googleCalendarName || "Viagem Mendoza & Buenos Aires 2026";
+  data.settings.googleCalendarUrl = byId("settingGoogleCalendarUrl")?.value.trim() || "";
+  data.settings.calendarTimezone = byId("settingCalendarTimezone")?.value.trim() || "America/Sao_Paulo";
+  data.settings.calendarId = byId("settingCalendarId")?.value.trim() || "";
+  saveData();
 }
 function cloudCalendarButton(type, id){
   if(!cloudConfigured()) return "";
@@ -1552,7 +1592,8 @@ function sanitizeDataForCloud(source){
 }
 async function cloudRequest(action, payload={}){
   ensureV6Defaults();
-  const url = (data.settings.appsScriptUrl || "").trim();
+  readSettingsFromPanelSilently();
+  const url = normalizeAppsScriptUrl(data.settings.appsScriptUrl || "").trim();
   const token = (data.settings.apiKey || "").trim();
   if(!url) throw new Error("Cole a URL /exec do Apps Script em Configurações.");
   if(!token) throw new Error("Preencha a chave de edição em Configurações.");
@@ -1668,39 +1709,61 @@ function openSheetsSetupModal(){
 }
 function renderSettings(){
   ensureV6Defaults();
-  const connected = cloudConfigured();
+  const hasUrl = Boolean((data.settings.appsScriptUrl || "").trim());
+  const hasKey = Boolean((data.settings.apiKey || "").trim());
+  const hasDrive = Boolean(data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || ""));
+  const ready = data.settings.syncMode === "sheets" && hasUrl && hasKey;
   const last = data.settings.lastSyncAt ? new Date(data.settings.lastSyncAt).toLocaleString("pt-BR") : "Nunca";
-  byId("settingsPanel").innerHTML = `<div class="settings-grid">
-      <div class="settings-box sync-box">
-        <h3>Sincronização Google Sheets</h3>
-        <p class="muted">A tela continua no GitHub Pages, mas os dados podem ficar em uma Planilha Google para abrir no celular, notebook e com sua esposa.</p>
-        <label>Modo de sincronização
-          <select id="settingSyncMode">
-            <option value="local" ${data.settings.syncMode === "local" ? "selected" : ""}>Local neste navegador</option>
-            <option value="sheets" ${data.settings.syncMode === "sheets" ? "selected" : ""}>Google Sheets + Apps Script</option>
-          </select>
-        </label>
-        <label>URL do Apps Script Web App /exec
+  const driveId = data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || "") || "";
+  byId("settingsPanel").innerHTML = `<div class="settings-grid settings-grid-simple">
+      <div class="settings-box settings-main">
+        <div class="simple-status ${ready ? "ok" : "pending"}">
+          <strong>${ready ? "Sincronização pronta" : "Configuração pendente"}</strong>
+          <span>${ready ? `Último sync: ${escapeHtml(last)}` : "Preencha a URL /exec e a chave de edição."}</span>
+        </div>
+
+        <h3>Conexão principal</h3>
+        <p class="muted">Para sincronizar entre notebook, celular e sua esposa, você só precisa manter estes campos preenchidos.</p>
+
+        <input id="settingSyncMode" type="hidden" value="sheets" />
+
+        <label>1. URL do Apps Script /exec
           <input id="settingAppsScriptUrl" value="${escapeAttr(data.settings.appsScriptUrl || "")}" placeholder="https://script.google.com/macros/s/.../exec" />
+          <small class="field-hint">Cole o link completo que termina em /exec. Se colar só o código AKfy..., eu tento completar automaticamente.</small>
         </label>
-        <label>Chave de edição
-          <input id="settingApiKey" value="${escapeAttr(data.settings.apiKey || "")}" placeholder="A mesma API_KEY do Code.gs" />
+
+        <label>2. Chave de edição
+          <input id="settingApiKey" value="${escapeAttr(data.settings.apiKey || "")}" placeholder="Ex.: mendoza-2026-elton-familia" />
+          <small class="field-hint">Tem que ser igual ao API_KEY do Código.gs.</small>
         </label>
-        <label class="checkbox-line"><input id="settingAutoSync" type="checkbox" ${data.settings.autoSync ? "checked" : ""} /> Salvar automaticamente na nuvem após edições</label>
-        <p class="muted"><strong>Status:</strong> ${connected ? "Pronto para sincronizar" : "Ainda local"} · <strong>Último sync:</strong> ${escapeHtml(last)}</p>
-        <div class="card-actions stack-actions">
-          <button class="secondary" onclick="openSheetsSetupModal()">Como configurar</button>
+
+        <label>3. Pasta do Google Drive
+          <input id="settingDriveFolderUrl" value="${escapeAttr(data.settings.driveFolderUrl || data.settings.driveFolderId || "")}" placeholder="Link ou ID da pasta do Drive" />
+          <small class="field-hint">ID detectado: <code>${escapeHtml(driveId || "aguardando")}</code></small>
+        </label>
+        <input id="settingDriveFolderId" type="hidden" value="${escapeAttr(driveId)}" />
+
+        <label class="checkbox-line"><input id="settingAutoSync" type="checkbox" ${data.settings.autoSync ? "checked" : ""} /> Salvar automaticamente após edições</label>
+
+        <div class="connection-checklist">
+          <span class="${hasUrl ? "done" : ""}">URL</span>
+          <span class="${hasKey ? "done" : ""}">Chave</span>
+          <span class="${hasDrive ? "done" : ""}">Drive</span>
+        </div>
+
+        <div class="card-actions stack-actions main-actions">
+          <button class="secondary" onclick="saveSettingsFromPanel()">Salvar ajustes</button>
           <button class="secondary" onclick="testCloudConnection()">Testar conexão</button>
-          <button class="secondary" onclick="setupCloudSheets()">Preparar planilha</button>
           <button class="primary" onclick="saveCloudNow(false)">Salvar na nuvem</button>
           <button class="secondary" onclick="loadCloudNow()">Carregar da nuvem</button>
         </div>
       </div>
-      <div class="settings-box calendar-box">
-        <h3>Calendário compartilhado</h3>
-        <p class="muted">A Central monta o roteiro. A agenda compartilhada recebe apenas eventos importantes com data/hora e lembrete.</p>
+
+      <details class="settings-box compact-details">
+        <summary>Agenda compartilhada <span>opcional</span></summary>
+        <p class="muted">Use só para eventos importantes com data, hora e lembrete. O roteiro continua sendo editado aqui na Central.</p>
         <label>Nome sugerido da agenda
-          <input id="settingGoogleCalendarName" value="${escapeAttr(data.settings.googleCalendarName || "")}" placeholder="Viagem Mendoza & Buenos Aires 2026" />
+          <input id="settingGoogleCalendarName" value="${escapeAttr(data.settings.googleCalendarName || "Viagem Mendoza & Buenos Aires 2026")}" />
         </label>
         <label>ID da agenda compartilhada
           <input id="settingCalendarId" value="${escapeAttr(data.settings.calendarId || "")}" placeholder="ex.: abc123@group.calendar.google.com" />
@@ -1709,61 +1772,36 @@ function renderSettings(){
           <input id="settingGoogleCalendarUrl" value="${escapeAttr(data.settings.googleCalendarUrl || "")}" placeholder="Cole o link da agenda, se quiser" />
         </label>
         <label>Fuso horário
-          <input id="settingCalendarTimezone" value="${escapeAttr(data.settings.calendarTimezone || "America/Sao_Paulo")}" placeholder="America/Sao_Paulo" />
+          <input id="settingCalendarTimezone" value="${escapeAttr(data.settings.calendarTimezone || "America/Sao_Paulo")}" />
         </label>
         <div class="card-actions">
           <button class="secondary" onclick="openCalendarSetupModal()">Como criar agenda</button>
-          ${data.settings.googleCalendarUrl ? `<a class="secondary" href="${escapeAttr(data.settings.googleCalendarUrl)}" target="_blank" rel="noopener">Abrir agenda</a>` : `<a class="secondary" href="https://calendar.google.com/calendar/u/0/r/settings/createcalendar" target="_blank" rel="noopener">Criar agenda no Google</a>`}
+          <a class="secondary" href="https://calendar.google.com/calendar/u/0/r/settings/createcalendar" target="_blank" rel="noopener">Criar agenda no Google</a>
         </div>
-      </div>
-      <div class="settings-box">
-        <h3>Google Drive para documentos</h3>
-        <p class="muted">Crie uma pasta da viagem no Drive, compartilhe com sua esposa e cole o link/ID aqui. Os arquivos anexados podem ser enviados para essa pasta.</p>
-        <label>Link ou ID da pasta do Drive
-          <input id="settingDriveFolderUrl" value="${escapeAttr(data.settings.driveFolderUrl || "")}" placeholder="https://drive.google.com/drive/folders/..." />
-        </label>
-        <label>ID detectado da pasta
-          <input id="settingDriveFolderId" value="${escapeAttr(data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || "") || "")}" placeholder="ID da pasta" />
-        </label>
-      </div>
-      <div class="settings-box">
-        <h3>Google Maps</h3>
-        <p class="muted">Cadastre os lugares na tela, cole o link compartilhado do Maps e informe latitude/longitude para aparecer no mapa interno.</p>
-        <div class="code-block">Fluxo:
-Google Maps → Compartilhar → Copiar link
-Central → Lugares → + Novo lugar → colar link
-Depois vincule Dia + Manhã/Tarde/Noite.</div>
-      </div>
-      <div class="settings-box">
-        <h3>Backup manual</h3>
-        <p class="muted">Mesmo com Google Sheets, mantenha backup JSON antes de grandes mudanças.</p>
-        <div class="card-actions">
-          <button class="secondary" onclick="exportJson()">Exportar JSON</button>
-          <label class="secondary file-label" for="importJson">Importar JSON</label>
+      </details>
+
+      <details class="settings-box compact-details">
+        <summary>Avançado e backup <span>segurança</span></summary>
+        <p class="muted">Use estes botões quando quiser manter uma cópia manual ou revalidar a estrutura da planilha.</p>
+        <div class="card-actions stack-actions">
+          <button class="secondary" onclick="setupCloudSheets()">Preparar/atualizar planilha</button>
+          <button class="secondary" onclick="exportJson()">Exportar backup JSON</button>
+          <label class="secondary file-label" for="importJson">Importar backup JSON</label>
+          <button class="secondary" onclick="openSheetsSetupModal()">Ver passo a passo técnico</button>
         </div>
-      </div>
-      <div class="settings-box">
-        <h3>Arquivos incluídos no ZIP</h3>
-        <div class="code-block">google-apps-script/Code.gs
-INSTRUCOES_GOOGLE_SHEETS_E_AGENDA.md
-index.html / style.css / app.js</div>
-      </div>
+      </details>
     </div>`;
 }
 function saveSettingsFromPanel(){
-  ensureV6Defaults();
-  data.settings.syncMode = byId("settingSyncMode")?.value || "local";
-  data.settings.appsScriptUrl = byId("settingAppsScriptUrl")?.value.trim() || "";
-  data.settings.apiKey = byId("settingApiKey")?.value.trim() || "";
-  data.settings.autoSync = Boolean(byId("settingAutoSync")?.checked);
-  data.settings.driveFolderUrl = byId("settingDriveFolderUrl")?.value.trim() || "";
-  data.settings.driveFolderId = byId("settingDriveFolderId")?.value.trim() || extractDriveFolderId(data.settings.driveFolderUrl || "") || "";
-  data.settings.googleCalendarName = byId("settingGoogleCalendarName")?.value.trim() || "";
-  data.settings.googleCalendarUrl = byId("settingGoogleCalendarUrl")?.value.trim() || "";
-  data.settings.calendarTimezone = byId("settingCalendarTimezone")?.value.trim() || "America/Sao_Paulo";
-  data.settings.calendarId = byId("settingCalendarId")?.value.trim() || "";
-  saveAndRender("Configurações salvas");
+  readSettingsFromPanelSilently();
+  if(data.settings.driveFolderUrl && data.settings.driveFolderUrl.includes("script.google.com")){
+    showToast("No campo do Drive, cole o link da pasta do Drive, não o /exec.");
+    return;
+  }
+  renderSettings();
+  showToast("Configurações salvas");
 }
+
 function init(){
   ensureV52Defaults();
   ensureV6Defaults();

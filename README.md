@@ -1,4 +1,4 @@
-# Central de Viagem — v6.1 Google Sheets + Agenda + Mapa corrigido
+# Central de Viagem — v6.2 Google Sheets + Agenda + Mapa corrigido
 
 Sistema visual editável para planejar viagem com roteiro, lugares, mapa, reservas, documentos, orçamento e pendências.
 
@@ -32,7 +32,7 @@ Suba `index.html`, `style.css`, `app.js`, `dados/` e `.nojekyll` no GitHub Pages
 Os arquivos da pasta `google-apps-script/` são para copiar no Apps Script, não precisam ser usados pelo GitHub Pages.
 
 
-## v6.1 — Mapa corrigido
+## v6.2 — Mapa corrigido
 
 Esta versão corrige o carregamento visual do mapa interno:
 
@@ -43,3 +43,8 @@ Esta versão corrige o carregamento visual do mapa interno:
 - melhora o carregamento após troca de abas, redimensionamento e atualização dos lugares.
 
 O mapa interno continua gratuito e não usa API do Google Maps. Links do Google Maps seguem funcionando nos lugares cadastrados.
+
+
+## v6.2
+
+Correção adicional do mapa: inclui fallback local das regras críticas do Leaflet no `style.css`, troca para tiles OSM diretos e adiciona recálculo/redesenho reforçado para evitar blocos soltos/quebrados.

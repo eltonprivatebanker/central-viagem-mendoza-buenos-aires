@@ -76,10 +76,15 @@ function forceMapRefresh(reason = ""){
   if(!mapEl) return;
   mapResizeCycle += 1;
   const cycle = mapResizeCycle;
-  [40, 140, 320, 700].forEach(delay => {
+  mapEl.classList.add("force-map-reflow");
+  [30, 120, 280, 650, 1100].forEach(delay => {
     setTimeout(() => {
-      if(cycle !== mapResizeCycle && delay > 140) return;
-      try{ map.invalidateSize({ pan:false }); }catch(err){ console.warn("Falha ao recalcular mapa", reason, err); }
+      if(cycle !== mapResizeCycle && delay > 280) return;
+      try{
+        map.invalidateSize({ pan:false });
+        if(mapTileLayer && typeof mapTileLayer.redraw === "function" && delay >= 280) mapTileLayer.redraw();
+      }catch(err){ console.warn("Falha ao recalcular mapa", reason, err); }
+      if(delay >= 650) mapEl.classList.remove("force-map-reflow");
     }, delay);
   });
 }
@@ -560,16 +565,19 @@ function initMap(){
       preferCanvas:true
     }).setView(DEFAULT_MAP_CENTER, 4);
 
-    // Camada gratuita mais estável visualmente que os tiles padrão do OSM.
-    // Continua usando dados do OpenStreetMap, mas servidos como base Carto.
-    mapTileLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    // v6.2: usamos uma camada OSM direta e simples para reduzir falhas de blocos/tiles.
+    // O CSS local no style.css também garante que o Leaflet não dependa apenas do CDN externo.
+    mapTileLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom:19,
       minZoom:2,
-      subdomains:"abcd",
-      detectRetina:true,
-      updateWhenIdle:true,
-      keepBuffer:4,
-      attribution:'&copy; OpenStreetMap &copy; CARTO'
+      tileSize:256,
+      zoomOffset:0,
+      detectRetina:false,
+      updateWhenIdle:false,
+      updateWhenZooming:false,
+      keepBuffer:6,
+      crossOrigin:true,
+      attribution:'&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     let loadedOnce = false;
@@ -602,7 +610,8 @@ function initMap(){
     }
     window.addEventListener("resize", () => forceMapRefresh("window-resize"));
     document.addEventListener("visibilitychange", () => { if(!document.hidden) forceMapRefresh("visibility"); });
-    setTimeout(() => { forceMapRefresh("init-delayed"); renderMapMarkers(); }, 300);
+    setTimeout(() => { forceMapRefresh("init-delayed"); renderMapMarkers(); }, 250);
+    setTimeout(() => { forceMapRefresh("init-delayed-2"); fitMap(false); }, 900);
   }catch(err){
     console.warn("Falha ao iniciar mapa", err);
     if(fallback) fallback.hidden = false;

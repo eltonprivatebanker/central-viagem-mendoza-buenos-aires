@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Central de Viagem · Mendoza & Buenos Aires</title>
+  <title>Central de Viagem Editável · Mendoza & Buenos Aires</title>
   <meta name="description" content="Planner visual de viagem com roteiro por dia, reservas, pendências, documentos e progresso." />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -23,6 +23,7 @@
         <a href="#pendencias">Pendências</a>
         <a href="#reservas">Reservas</a>
         <a href="#documentos">Documentos</a>
+        <button class="nav-edit-button" type="button" id="editModeButton">Editar</button>
       </div>
     </nav>
 
@@ -55,7 +56,13 @@
           <span class="section-kicker">Painel</span>
           <h2>Visão geral</h2>
         </div>
-        <button class="ghost-button" type="button" id="printButton">Imprimir / salvar PDF</button>
+        <div class="section-actions">
+          <button class="ghost-button" type="button" id="editTripButton">Editar capa</button>
+          <button class="ghost-button" type="button" id="exportButton">Exportar JSON</button>
+          <button class="ghost-button" type="button" id="importButton">Importar JSON</button>
+          <button class="ghost-button danger-button" type="button" id="resetButton">Resetar</button>
+          <button class="ghost-button" type="button" id="printButton">Imprimir / salvar PDF</button>
+        </div>
       </div>
 
       <div class="kpi-grid" id="kpiGrid"></div>
@@ -68,11 +75,14 @@
           <h2>Pendências da viagem</h2>
         </div>
 
-        <div class="filters" role="group" aria-label="Filtrar pendências">
+        <div class="section-actions mixed-actions">
+          <button class="primary-button edit-only" type="button" id="addTaskButton">+ Pendência</button>
+          <div class="filters" role="group" aria-label="Filtrar pendências">
           <button class="filter is-active" type="button" data-task-filter="all">Todas</button>
           <button class="filter" type="button" data-task-filter="pending">Pendentes</button>
           <button class="filter" type="button" data-task-filter="critical">Críticas</button>
           <button class="filter" type="button" data-task-filter="done">Concluídas</button>
+          </div>
         </div>
       </div>
 
@@ -86,12 +96,15 @@
           <h2>Roteiro por período</h2>
         </div>
 
-        <label class="select-label">
-          Cidade
-          <select id="cityFilter">
-            <option value="all">Todas</option>
-          </select>
-        </label>
+<div class="section-actions mixed-actions">
+          <button class="primary-button edit-only" type="button" id="addDayButton">+ Dia/evento</button>
+          <label class="select-label">
+            Cidade
+            <select id="cityFilter">
+              <option value="all">Todas</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       <div class="timeline" id="timeline"></div>
@@ -99,22 +112,24 @@
 
     <section class="section split" id="reservas">
       <div>
-        <div class="section-head compact">
+<div class="section-head compact">
           <div>
             <span class="section-kicker">Base</span>
             <h2>Reservas e deslocamentos</h2>
           </div>
+          <button class="primary-button edit-only" type="button" id="addBookingButton">+ Reserva</button>
         </div>
 
         <div class="cards-list" id="bookingList"></div>
       </div>
 
       <div>
-        <div class="section-head compact">
+<div class="section-head compact">
           <div>
             <span class="section-kicker">Apoio</span>
             <h2>Links úteis</h2>
           </div>
+          <button class="primary-button edit-only" type="button" id="addLinkButton">+ Link</button>
         </div>
 
         <div class="cards-list" id="linksList"></div>
@@ -122,19 +137,45 @@
     </section>
 
     <section class="section" id="documentos">
-      <div class="section-head">
+<div class="section-head">
         <div>
           <span class="section-kicker">Checklist</span>
           <h2>Documentos e arquivos</h2>
         </div>
+        <button class="primary-button edit-only" type="button" id="addDocumentButton">+ Documento</button>
       </div>
 
       <div class="document-grid" id="documentGrid"></div>
     </section>
   </main>
 
+<div class="modal" id="editorModal" hidden>
+    <div class="modal-backdrop" data-action="closeModal"></div>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+      <form id="editorForm">
+        <header class="modal-head">
+          <div>
+            <span class="section-kicker">Edição</span>
+            <h2 id="editorTitle">Editar</h2>
+          </div>
+          <button class="icon-button" type="button" data-action="closeModal" aria-label="Fechar">×</button>
+        </header>
+
+        <div class="form-grid" id="editorFields"></div>
+
+        <footer class="modal-actions">
+          <button class="ghost-button" type="button" data-action="closeModal">Cancelar</button>
+          <button class="primary-button" type="submit">Salvar</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <input type="file" id="importFile" accept="application/json" hidden />
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
   <footer class="footer">
-    <p>Dados editáveis em <code>dados/viagem.json</code>. Projeto estático pronto para GitHub Pages.</p>
+    <p>Agora você pode editar na própria tela. As alterações ficam salvas neste navegador via <code>localStorage</code>. Use <strong>Exportar JSON</strong> para guardar uma cópia ou atualizar o GitHub.</p>
   </footer>
 
   <script src="app.js"></script>

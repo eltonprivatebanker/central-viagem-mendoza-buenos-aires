@@ -1,4 +1,4 @@
-# Central de Viagem — Mendoza & Buenos Aires
+# Central de Viagem — Mendoza & Buenos Aires v2 Editável
 
 Projeto estático em HTML, CSS e JavaScript para organizar uma viagem com:
 
@@ -11,9 +11,38 @@ Projeto estático em HTML, CSS e JavaScript para organizar uma viagem com:
 - documentos;
 - progresso geral.
 
+## Novidade da v2
+
+Agora a página permite editar pela própria tela:
+
+- editar dados da capa;
+- adicionar, editar e excluir pendências;
+- adicionar, editar e excluir dias/eventos do roteiro;
+- adicionar, editar e excluir reservas;
+- adicionar, editar e excluir links úteis;
+- adicionar, editar e excluir documentos;
+- marcar pendências como concluídas;
+- exportar JSON com a versão editada;
+- importar JSON salvo anteriormente;
+- resetar a base local.
+
+## Como funciona o salvamento
+
+Como o GitHub Pages é estático, a página não consegue alterar automaticamente o arquivo `dados/viagem.json` dentro do repositório.
+
+Por isso, as edições feitas na tela são salvas no próprio navegador usando `localStorage`.
+
+Isso significa:
+
+- ao atualizar a página, os dados continuam salvos naquele navegador;
+- os dados não aparecem automaticamente em outro computador/celular;
+- para guardar uma cópia, use **Exportar JSON**;
+- para levar os dados para outro navegador, use **Importar JSON**;
+- para atualizar a base oficial do GitHub, substitua o arquivo `dados/viagem.json` pelo JSON exportado.
+
 ## Estrutura
 
-```text
+```txt
 central-viagem-mendoza-buenos-aires/
 ├── index.html
 ├── style.css
@@ -23,58 +52,21 @@ central-viagem-mendoza-buenos-aires/
     └── viagem.json
 ```
 
-## Como editar os dados da viagem
+## Como publicar no GitHub Pages
 
-Abra o arquivo:
+1. Envie todos os arquivos para a raiz do repositório.
+2. Vá em **Settings → Pages**.
+3. Em **Build and deployment**, escolha **Deploy from a branch**.
+4. Selecione a branch `main` e a pasta `/root`.
+5. Salve e aguarde a publicação.
 
-```text
-dados/viagem.json
-```
+## Próxima evolução possível
 
-Edite:
+Para virar um sistema completo, com dados sincronizados entre celular e computador, será necessário usar um backend, por exemplo:
 
-- título;
-- período;
-- dias do roteiro;
-- manhã/tarde/noite;
-- reservas;
-- links;
-- documentos;
-- pendências.
+- Supabase;
+- Firebase;
+- Google Sheets + Apps Script;
+- GitHub API com autenticação.
 
-## Como testar no computador
-
-Opção simples:
-
-1. Abra a pasta do projeto.
-2. Clique duas vezes no `index.html`.
-
-Observação: alguns navegadores bloqueiam o carregamento do JSON via `file://`.
-Por isso o `app.js` tem dados internos de fallback. No GitHub Pages o JSON carrega normalmente.
-
-Opção melhor, com servidor local:
-
-```bash
-python -m http.server 8000
-```
-
-Depois abra:
-
-```text
-http://localhost:8000
-```
-
-## Como subir no GitHub Pages
-
-1. Crie um repositório chamado `central-viagem-mendoza-buenos-aires`.
-2. Envie todos estes arquivos para a raiz do repositório.
-3. Vá em **Settings → Pages**.
-4. Em **Build and deployment**, escolha **Deploy from a branch**.
-5. Selecione a branch `main` e a pasta `/root`.
-6. Salve e aguarde a publicação.
-
-## Observações
-
-- O projeto é estático, então alterações feitas no navegador não salvam no GitHub automaticamente.
-- O checklist marcado como concluído usa `localStorage`, ou seja, fica salvo só naquele navegador.
-- Para atualizar oficialmente o roteiro, edite o arquivo `dados/viagem.json`.
+Esta v2 é a melhor evolução sem backend: visual, editável e persistente no navegador.

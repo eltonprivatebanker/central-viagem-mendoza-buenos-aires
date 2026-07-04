@@ -1,1092 +1,492 @@
-const FALLBACK_DATA = {
-  "viagem": {
-    "titulo": "Mendoza & Buenos Aires em família",
-    "subtitulo": "Roteiro visual com dias, reservas, pendências, documentos e links úteis.",
-    "periodo": "27/07 a 10/08",
-    "origem": "Puerto Iguazú / Foz do Iguaçu",
-    "pessoas": "Família",
-    "observacao": "Base inicial editável. Atualize pela própria tela conforme reservas forem fechadas."
+/* Central de Viagem v4 — Wanderlog inspired, estático e editável */
+const STORAGE_KEY = "centralViagemV4";
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+const cityCoords = {
+  "Buenos Aires": [-34.6037, -58.3816],
+  "Mendoza": [-32.8895, -68.8458],
+  "Foz do Iguaçu": [-25.5163, -54.5854],
+  "Puerto Iguazú": [-25.5972, -54.5786],
+  "Aconcágua": [-32.6532, -70.0112]
+};
+
+const defaultData = {
+  trip: {
+    title: "Mendoza & Buenos Aires em família",
+    subtitle: "Organize roteiro, lugares, documentos, reservas e orçamento em uma tela integrada.",
+    period: "27/07 a 10/08",
+    base: "Puerto Iguazú / Foz do Iguaçu",
+    people: "Elton, família e Oliver"
   },
-  "kpis": [
-    {"rotulo":"Dias de viagem","valor":"15","detalhe":"Base inicial do roteiro"},
-    {"rotulo":"Cidades","valor":"2","detalhe":"Buenos Aires e Mendoza"},
-    {"rotulo":"Reservas","valor":"4","detalhe":"Voos, hotéis e carro"},
-    {"rotulo":"Pendências","valor":"6","detalhe":"Atualize o checklist"}
+  days: [
+    { id: "d1", number: 1, label: "Seg 27/07", date: "27/07", title: "Saída da viagem", city: "Deslocamento", morning: "Conferir documentos, malas, dinheiro/cartões e deslocamento até o ponto de saída.", afternoon: "Viagem/deslocamento. Guardar comprovantes e localizadores.", night: "Chegada e check-in, se aplicável. Jantar leve." },
+    { id: "d2", number: 2, label: "Ter 28/07", date: "28/07", title: "Ambientação", city: "Buenos Aires", morning: "Café e passeio leve perto do hotel.", afternoon: "Puerto Madero, cafés e pontos próximos.", night: "Jantar reservado ou restaurante próximo." },
+    { id: "d3", number: 3, label: "Qua 29/07", date: "29/07", title: "Recoleta e Palermo", city: "Buenos Aires", morning: "Recoleta, flor metálica ou pontos próximos.", afternoon: "Palermo, parques e pausa para o Oliver.", night: "Restaurante/experiência cultural leve." },
+    { id: "d4", number: 4, label: "Qui 30/07", date: "30/07", title: "Deslocamento para Mendoza", city: "Mendoza", morning: "Checkout e deslocamento.", afternoon: "Chegada em Mendoza e retirada de carro, se aplicável.", night: "Check-in e jantar tranquilo." }
   ],
-  "tarefas": [
-    {"id":"hotel-ba","titulo":"Confirmar hotel em Buenos Aires","descricao":"Validar localização, política de cancelamento e café da manhã.","status":"pending","critica":true},
-    {"id":"hotel-mendoza","titulo":"Confirmar hotel em Mendoza","descricao":"Priorizar base confortável para vinícolas e passeios com criança.","status":"pending","critica":true},
-    {"id":"carro","titulo":"Aluguel de carro em Mendoza","descricao":"Conferir seguro, cadeirinha, retirada e devolução.","status":"pending","critica":false},
-    {"id":"docs","titulo":"Separar documentos","descricao":"RG/passaporte, reservas, seguro viagem e comprovantes em PDF.","status":"pending","critica":true},
-    {"id":"vinicolas","titulo":"Selecionar vinícolas","descricao":"Escolher experiências com boa logística e horários adequados.","status":"pending","critica":false},
-    {"id":"kids","titulo":"Programação do Oliver","descricao":"Intercalar passeios leves, parques e pausas durante o dia.","status":"done","critica":false}
+  places: [
+    { id: "p1", name: "Puerto Madero", city: "Buenos Aires", category: "Passeio", status: "planned", dayId: "d2", period: "afternoon", lat: -34.6118, lng: -58.3638, priority: "Alta", notes: "Bom para caminhada leve, fotos e restaurante.", url: "https://www.google.com/maps/search/Puerto+Madero" },
+    { id: "p2", name: "Recoleta", city: "Buenos Aires", category: "Bairro", status: "planned", dayId: "d3", period: "morning", lat: -34.5875, lng: -58.3974, priority: "Alta", notes: "Região clássica, fácil de combinar com cafés e parques.", url: "https://www.google.com/maps/search/Recoleta+Buenos+Aires" },
+    { id: "p3", name: "Parque General San Martín", city: "Mendoza", category: "Parque", status: "wishlist", dayId: "", period: "free", lat: -32.8892, lng: -68.8745, priority: "Média", notes: "Boa opção visual e leve para família.", url: "https://www.google.com/maps/search/Parque+General+San+Martin+Mendoza" },
+    { id: "p4", name: "Parque Provincial Aconcágua", city: "Aconcágua", category: "Montanha", status: "wishlist", dayId: "", period: "free", lat: -32.8244, lng: -69.9425, priority: "Alta", notes: "Validar clima, estrada, altitude e se vale para ir com criança.", url: "https://www.google.com/maps/search/Parque+Provincial+Aconcagua" }
   ],
-  "dias": [
-    {
-      "id":"dia-1",
-      "dia":"Dia 1",
-      "data":"27/07",
-      "cidade":"Deslocamento",
-      "titulo":"Saída e chegada",
-      "manha":"Conferência de documentos, malas e deslocamento inicial.",
-      "tarde":"Embarque/viagem. Guardar comprovantes e horários no celular.",
-      "noite":"Chegada, check-in e jantar leve próximo ao hotel.",
-      "link":""
-    },
-    {
-      "id":"dia-2",
-      "dia":"Dia 2",
-      "data":"28/07",
-      "cidade":"Buenos Aires",
-      "titulo":"Primeiro contato com a cidade",
-      "manha":"Café sem pressa e passeio leve pela região do hotel.",
-      "tarde":"Puerto Madero, livraria, cafés ou passeio panorâmico.",
-      "noite":"Jantar reservado ou opção próxima ao hotel."
-    },
-    {
-      "id":"dia-3",
-      "dia":"Dia 3",
-      "data":"29/07",
-      "cidade":"Buenos Aires",
-      "titulo":"Bairros clássicos",
-      "manha":"Recoleta e pontos próximos.",
-      "tarde":"Palermo, parques e pausa para o Oliver.",
-      "noite":"Restaurante ou experiência cultural leve."
-    },
-    {
-      "id":"dia-4",
-      "dia":"Dia 4",
-      "data":"30/07",
-      "cidade":"Buenos Aires",
-      "titulo":"Dia flexível",
-      "manha":"Passeio pendente ou atividade indoor se o clima não ajudar.",
-      "tarde":"Compras, cafés ou museu.",
-      "noite":"Organizar malas para deslocamento."
-    },
-    {
-      "id":"dia-5",
-      "dia":"Dia 5",
-      "data":"31/07",
-      "cidade":"Mendoza",
-      "titulo":"Chegada em Mendoza",
-      "manha":"Deslocamento para aeroporto/rodoviária conforme decisão.",
-      "tarde":"Chegada, retirada do carro e check-in.",
-      "noite":"Jantar tranquilo e revisão dos passeios."
-    },
-    {
-      "id":"dia-6",
-      "dia":"Dia 6",
-      "data":"01/08",
-      "cidade":"Mendoza",
-      "titulo":"Vinícolas e paisagem",
-      "manha":"Vinícola 1 com reserva confirmada.",
-      "tarde":"Almoço em vinícola ou passeio cênico.",
-      "noite":"Retorno cedo e descanso."
-    },
-    {
-      "id":"dia-7",
-      "dia":"Dia 7",
-      "data":"02/08",
-      "cidade":"Mendoza",
-      "titulo":"Montanha / neve",
-      "manha":"Saída para rota de montanha, conforme clima e estrada.",
-      "tarde":"Paradas panorâmicas e atividade leve.",
-      "noite":"Jantar próximo e checklist do dia seguinte."
-    }
+  tasks: [
+    { id: "t1", title: "Definir hotel em Buenos Aires", description: "Conferir bairro, café da manhã, cancelamento e distância dos passeios.", critical: true, done: false },
+    { id: "t2", title: "Definir hotel em Mendoza", description: "Priorizar conforto, estacionamento e boa saída para vinícolas/montanha.", critical: true, done: false },
+    { id: "t3", title: "Reservar carro em Mendoza", description: "Conferir seguro, cadeirinha, caução e horários.", critical: false, done: false },
+    { id: "t4", title: "Escolher vinícolas", description: "Selecionar poucas experiências boas, com logística leve.", critical: false, done: false }
   ],
-  "reservas": [
-    {"id":"reserva-1","tipo":"Voo / deslocamento","nome":"Origem → Buenos Aires","detalhe":"Inserir código/localizador e horários.","status":"pending"},
-    {"id":"reserva-2","tipo":"Hospedagem","nome":"Hotel Buenos Aires","detalhe":"Adicionar endereço, check-in e link da reserva.","status":"pending"},
-    {"id":"reserva-3","tipo":"Deslocamento","nome":"Buenos Aires → Mendoza","detalhe":"Definir voo, ônibus ou carro conforme logística.","status":"pending"},
-    {"id":"reserva-4","tipo":"Hospedagem","nome":"Hotel Mendoza","detalhe":"Adicionar endereço, estacionamento e café da manhã.","status":"pending"}
+  reservations: [
+    { id: "r1", type: "Hospedagem", title: "Hotel em Buenos Aires", status: "Pendente", date: "27/07", amount: 0, link: "", notes: "Escolher bairro e política de cancelamento." },
+    { id: "r2", type: "Carro", title: "Carro em Mendoza", status: "Pendente", date: "30/07", amount: 0, link: "", notes: "Conferir seguro e cadeirinha." }
   ],
-  "links": [
-    {"id":"link-1","titulo":"Mapa geral da viagem","descricao":"Cole aqui o link do Google Maps com pontos salvos.","url":"#"},
-    {"id":"link-2","titulo":"Planilha de orçamento","descricao":"Cole aqui o link do Google Sheets, se usar base externa.","url":"#"},
-    {"id":"link-3","titulo":"Pasta de documentos","descricao":"Cole aqui o link do Google Drive com PDFs e comprovantes.","url":"#"}
+  documents: [
+    { id: "doc1", title: "Documentos pessoais", type: "PDF/Imagem", status: "Pendente", link: "", notes: "RG/passaporte de todos." },
+    { id: "doc2", title: "Seguro viagem", type: "Apólice", status: "Pendente", link: "", notes: "Apólice e telefones de emergência." },
+    { id: "doc3", title: "Reservas de hotéis", type: "Comprovante", status: "Pendente", link: "", notes: "Links do Booking/Airbnb/Drive." }
   ],
-  "documentos": [
-    {"id":"documento-1","nome":"Documentos pessoais","detalhe":"RG/passaporte de todos","status":"pending"},
-    {"id":"documento-2","nome":"Seguro viagem","detalhe":"Apólice e telefones de suporte","status":"pending"},
-    {"id":"documento-3","nome":"Reservas de hotel","detalhe":"PDFs e comprovantes","status":"pending"},
-    {"id":"documento-4","nome":"Ingressos/passeios","detalhe":"Voucher, horários e contatos","status":"pending"}
+  expenses: [
+    { id: "e1", category: "Hospedagem", title: "Previsão hotéis", city: "Buenos Aires/Mendoza", expected: 0, paid: 0, date: "", notes: "Preencher após cotação." }
   ]
 };
 
-const STORAGE_KEY = "central_viagem_data_v3";
-const EDIT_MODE_KEY = "central_viagem_edit_mode_v3";
-const LEGACY_CHECKED_KEY = "trip_checked_tasks";
-const FILE_DB_NAME = "central_viagem_arquivos_v1";
-const FILE_STORE_NAME = "arquivos";
+let data = loadData();
+let currentView = "overview";
+let selectedPlaceId = null;
+let map, markersLayer;
 
-let state = {
-  data: null,
-  taskFilter: "all",
-  cityFilter: "all",
-  editMode: localStorage.getItem(EDIT_MODE_KEY) === "true",
-  currentEditor: null
-};
-
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => Array.from(document.querySelectorAll(selector));
-
-async function loadData(){
-  let baseData = structuredCloneSafe(FALLBACK_DATA);
-
+function loadData(){
   try{
-    const response = await fetch("dados/viagem.json", {cache:"no-store"});
-    if(!response.ok) throw new Error("Não foi possível carregar dados/viagem.json");
-    baseData = await response.json();
-  }catch(error){
-    console.warn("Usando dados internos de fallback:", error);
-  }
-
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if(saved){
-    try{
-      state.data = JSON.parse(saved);
-    }catch(error){
-      console.warn("Dados salvos inválidos. Voltando para a base do projeto.", error);
-      state.data = baseData;
-    }
-  }else{
-    state.data = baseData;
-    applyLegacyCheckedTasks();
-  }
-
-  ensureDataShape();
-  render();
-  showToast(saved ? "Dados locais carregados." : "Base inicial carregada.");
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){ console.warn("Falha ao carregar dados locais", e); }
+  return structuredClone(defaultData);
+}
+function saveData(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function formatCurrency(v){
+  return Number(v||0).toLocaleString("pt-BR", { style:"currency", currency:"BRL", maximumFractionDigits:0 });
+}
+function byId(id){ return document.getElementById(id); }
+function escapeHtml(str=""){
+  return String(str).replace(/[&<>"]/g, s => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[s]));
+}
+function statusLabel(status){
+  return ({wishlist:"Quero visitar", planned:"Planejado", booked:"Reservado", done:"Concluído", discarded:"Descartado"})[status] || status || "Quero visitar";
+}
+function periodLabel(period){
+  return ({morning:"Manhã", afternoon:"Tarde", night:"Noite", free:"Sem período"})[period] || "Sem período";
+}
+function dayName(dayId){
+  const d = data.days.find(x=>x.id===dayId);
+  return d ? `Dia ${String(d.number).padStart(2,"0")} · ${d.title}` : "Sem dia definido";
+}
+function uniqueCities(){
+  return [...new Set(data.places.map(p=>p.city).filter(Boolean).concat(data.days.map(d=>d.city).filter(Boolean)))].filter(c=>c!=="Deslocamento").sort();
 }
 
-function structuredCloneSafe(value){
-  return JSON.parse(JSON.stringify(value));
-}
-
-function ensureDataShape(){
-  const data = state.data || {};
-  data.viagem = data.viagem || {};
-  data.kpis = Array.isArray(data.kpis) ? data.kpis : [];
-  data.tarefas = Array.isArray(data.tarefas) ? data.tarefas : [];
-  data.dias = Array.isArray(data.dias) ? data.dias : [];
-  data.reservas = Array.isArray(data.reservas) ? data.reservas : [];
-  data.links = Array.isArray(data.links) ? data.links : [];
-  data.documentos = Array.isArray(data.documentos) ? data.documentos : [];
-
-  data.tarefas.forEach((item, index) => item.id = item.id || `task-${index + 1}-${uid()}`);
-  data.dias.forEach((item, index) => item.id = item.id || `day-${index + 1}-${uid()}`);
-  data.reservas.forEach((item, index) => item.id = item.id || `booking-${index + 1}-${uid()}`);
-  data.links.forEach((item, index) => item.id = item.id || `link-${index + 1}-${uid()}`);
-  data.documentos.forEach((item, index) => {
-    item.id = item.id || `doc-${index + 1}-${uid()}`;
-    item.url = item.url || "";
-    item.status = item.status || "pending";
-    item.arquivo = item.arquivo || null;
-  });
-
-  state.data = data;
-}
-
-function applyLegacyCheckedTasks(){
-  try{
-    const checkedTasks = JSON.parse(localStorage.getItem(LEGACY_CHECKED_KEY) || "{}");
-    if(!checkedTasks || !state.data?.tarefas) return;
-
-    state.data.tarefas = state.data.tarefas.map(task => {
-      if(checkedTasks[task.id]) return {...task, status:"done"};
-      return task;
-    });
-  }catch(error){
-    console.warn("Não foi possível migrar checklist antigo.", error);
-  }
-}
-
-function saveData(message = "Alteração salva neste navegador."){
-  ensureDataShape();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
-  render();
-  showToast(message);
-}
-
-function getTasks(){
-  return (state.data.tarefas || []).map(task => ({...task, status: task.status || "pending"}));
-}
-
-function getProgress(){
-  const tasks = getTasks();
-  if(!tasks.length) return {done:0,total:0,percent:0,pending:0,criticalPending:0};
-
-  const done = tasks.filter(task => task.status === "done").length;
-  const pending = tasks.length - done;
-  const criticalPending = tasks.filter(task => task.critica && task.status !== "done").length;
-  const percent = Math.round((done / tasks.length) * 100);
-
-  return {done,total:tasks.length,percent,pending,criticalPending};
-}
-
-function statusLabel(status, critical=false){
-  if(status === "done") return "Concluído";
-  if(critical) return "Crítico";
-  return "Pendente";
-}
-
-function statusClass(status, critical=false){
-  if(status === "done") return "done";
-  if(critical) return "critical";
-  return "pending";
-}
-
-function renderHero(){
-  const viagem = state.data.viagem || {};
-  const progress = getProgress();
-
-  $("#tripTitle").textContent = viagem.titulo || "Central de Viagem";
-  $("#tripSubtitle").textContent = viagem.subtitulo || "";
-  $("#tripMeta").innerHTML = [
-    ["📅", viagem.periodo],
-    ["📍", viagem.origem],
-    ["👨‍👩‍👦", viagem.pessoas],
-    ["🧭", viagem.observacao]
-  ].filter(([,value]) => value).map(([icon,value]) => `<span class="pill">${icon} ${escapeHtml(value)}</span>`).join("");
-
-  $("#progressPercent").textContent = `${progress.percent}%`;
-  $("#progressBar").style.width = `${progress.percent}%`;
-
-  const text = progress.pending === 0
-    ? "Tudo marcado como concluído."
-    : `${progress.pending} pendência(s) abertas, sendo ${progress.criticalPending} crítica(s).`;
-
-  $("#progressText").textContent = text;
-}
-
-function renderKpis(){
-  const progress = getProgress();
-  const dataKpis = state.data.kpis || [];
-
-  const autoKpis = [
-    {rotulo:"Progresso", valor:`${progress.percent}%`, detalhe:`${progress.done} de ${progress.total} tarefas concluídas`}
-  ];
-
-  $("#kpiGrid").innerHTML = [...autoKpis, ...dataKpis].slice(0, 4).map(kpi => `
-    <article class="kpi">
-      <span>${escapeHtml(kpi.rotulo)}</span>
-      <strong>${escapeHtml(kpi.valor)}</strong>
-      <small>${escapeHtml(kpi.detalhe || "")}</small>
-    </article>
-  `).join("");
-}
-
-function renderTasks(){
-  updateFilterButtons();
-
-  const tasks = getTasks().filter(task => {
-    if(state.taskFilter === "all") return true;
-    if(state.taskFilter === "critical") return task.critica && task.status !== "done";
-    if(state.taskFilter === "done") return task.status === "done";
-    if(state.taskFilter === "pending") return task.status !== "done";
-    return true;
-  });
-
-  $("#taskBoard").innerHTML = tasks.map(task => {
-    const cls = statusClass(task.status, task.critica);
-    return `
-      <article class="task ${task.critica && task.status !== "done" ? "is-critical" : ""}">
-        <div class="task-top">
-          <h3>${escapeHtml(task.titulo)}</h3>
-          <span class="status ${cls}">${statusLabel(task.status, task.critica)}</span>
-        </div>
-        <p>${escapeHtml(task.descricao || "")}</p>
-        <label>
-          <input type="checkbox" data-task-check="${escapeAttribute(task.id)}" ${task.status === "done" ? "checked" : ""} />
-          Marcar como concluído
-        </label>
-        ${editControls("task", task.id)}
-      </article>
-    `;
-  }).join("") || `<p class="empty">Nenhuma pendência neste filtro.</p>`;
-}
-
-function renderCityFilter(){
-  const select = $("#cityFilter");
-  const cities = [...new Set((state.data.dias || []).map(day => day.cidade).filter(Boolean))];
-
-  const current = state.cityFilter;
-  select.innerHTML = `<option value="all">Todas</option>` + cities.map(city => (
-    `<option value="${escapeAttribute(city)}">${escapeHtml(city)}</option>`
-  )).join("");
-  select.value = cities.includes(current) ? current : "all";
-  if(select.value === "all") state.cityFilter = "all";
-}
-
-function renderTimeline(){
-  const days = (state.data.dias || []).filter(day => {
-    return state.cityFilter === "all" || day.cidade === state.cityFilter;
-  });
-
-  $("#timeline").innerHTML = days.map(day => `
-    <article class="day-card">
-      <header class="day-head">
-        <div>
-          <h3>${escapeHtml(day.dia)} · ${escapeHtml(day.titulo || "")}</h3>
-          <small>${escapeHtml(day.data || "")}</small>
-        </div>
-        <div class="day-actions">
-          <span class="city-tag">${escapeHtml(day.cidade || "Roteiro")}</span>
-          ${dayEditControls(day.id)}
-        </div>
-      </header>
-      <div class="period-grid">
-        ${periodBlock("Manhã", day.manha)}
-        ${periodBlock("Tarde", day.tarde)}
-        ${periodBlock("Noite", day.noite, day.link)}
-      </div>
-    </article>
-  `).join("") || `<p class="empty">Nenhum dia encontrado para esta cidade.</p>`;
-}
-
-function periodBlock(title, text, link){
-  return `
-    <div class="period">
-      <strong>${escapeHtml(title)}</strong>
-      <p>${escapeHtml(text || "A definir.")}</p>
-      ${link ? `<a href="${safeHref(link)}" target="_blank" rel="noopener">Abrir link</a>` : ""}
-    </div>
-  `;
-}
-
-function renderBookings(){
-  $("#bookingList").innerHTML = (state.data.reservas || []).map(item => `
-    <article class="booking">
-      <div class="booking-top">
-        <strong>${escapeHtml(item.nome)}</strong>
-        <span class="status ${statusClass(item.status)}">${statusLabel(item.status)}</span>
-      </div>
-      <span>${escapeHtml(item.tipo || "")}</span>
-      <span>${escapeHtml(item.detalhe || "")}</span>
-      ${editControls("booking", item.id)}
-    </article>
-  `).join("") || `<p class="empty">Nenhuma reserva cadastrada.</p>`;
-
-  $("#linksList").innerHTML = (state.data.links || []).map(link => `
-    <article class="link-card">
-      <strong>${escapeHtml(link.titulo)}</strong>
-      <span>${escapeHtml(link.descricao || "")}</span>
-      <a href="${safeHref(link.url || "#")}" target="_blank" rel="noopener">Abrir</a>
-      ${editControls("link", link.id)}
-    </article>
-  `).join("") || `<p class="empty">Nenhum link cadastrado.</p>`;
-}
-
-function renderDocuments(){
-  $("#documentGrid").innerHTML = (state.data.documentos || []).map(doc => `
-    <article class="document">
-      <div class="document-top">
-        <strong>${escapeHtml(doc.nome)}</strong>
-        <span class="status ${statusClass(doc.status)}">${statusLabel(doc.status)}</span>
-      </div>
-      <span>${escapeHtml(doc.detalhe || "")}</span>
-      ${doc.url ? `<a class="document-link" href="${safeHref(doc.url)}" target="_blank" rel="noopener">Abrir link externo</a>` : ""}
-      ${documentAttachmentBlock(doc)}
-      ${editControls("document", doc.id)}
-      ${documentFileControls(doc)}
-    </article>
-  `).join("") || `<p class="empty">Nenhum documento cadastrado.</p>`;
-}
-
-function documentAttachmentBlock(doc){
-  if(!doc.arquivo?.fileId) return `<div class="file-empty">Nenhum arquivo enviado ainda.</div>`;
-
-  return `
-    <div class="file-box">
-      <span class="file-icon">📎</span>
-      <div>
-        <strong>${escapeHtml(doc.arquivo.nome || "Arquivo")}</strong>
-        <small>${escapeHtml(formatBytes(doc.arquivo.tamanho || 0))}${doc.arquivo.enviadoEm ? ` · ${escapeHtml(doc.arquivo.enviadoEm)}` : ""}</small>
-      </div>
-    </div>
-  `;
-}
-
-function documentFileControls(doc){
-  const hasFile = Boolean(doc.arquivo?.fileId);
-  return `
-    <div class="file-actions">
-      ${hasFile ? `<button type="button" class="mini-button" data-action="downloadDocument" data-id="${escapeAttribute(doc.id)}">Baixar arquivo</button>` : ""}
-      <button type="button" class="mini-button edit-only-inline" data-action="uploadDocument" data-id="${escapeAttribute(doc.id)}">${hasFile ? "Trocar arquivo" : "Enviar arquivo"}</button>
-      ${hasFile ? `<button type="button" class="mini-button danger-mini edit-only-inline" data-action="removeDocumentFile" data-id="${escapeAttribute(doc.id)}">Remover arquivo</button>` : ""}
-    </div>
-  `;
-}
-
-function editControls(type, id){
-  if(!state.editMode) return "";
-  return `
-    <div class="card-actions edit-only-inline">
-      <button type="button" class="mini-button" data-action="edit" data-type="${escapeAttribute(type)}" data-id="${escapeAttribute(id)}">Editar</button>
-      <button type="button" class="mini-button danger-mini" data-action="delete" data-type="${escapeAttribute(type)}" data-id="${escapeAttribute(id)}">Excluir</button>
-    </div>
-  `;
-}
-
-function dayEditControls(id){
-  if(!state.editMode) return "";
-  return `
-    <div class="card-actions edit-only-inline day-toolbox">
-      <button type="button" class="mini-button" data-action="move" data-type="day" data-direction="up" data-id="${escapeAttribute(id)}" title="Mover dia para cima">↑</button>
-      <button type="button" class="mini-button" data-action="move" data-type="day" data-direction="down" data-id="${escapeAttribute(id)}" title="Mover dia para baixo">↓</button>
-      <button type="button" class="mini-button" data-action="edit" data-type="day" data-id="${escapeAttribute(id)}">Editar agenda</button>
-      <button type="button" class="mini-button" data-action="duplicate" data-type="day" data-id="${escapeAttribute(id)}">Duplicar</button>
-      <button type="button" class="mini-button danger-mini" data-action="delete" data-type="day" data-id="${escapeAttribute(id)}">Excluir</button>
-    </div>
-  `;
-}
-
-function updateFilterButtons(){
-  $$('[data-task-filter]').forEach(btn => {
-    btn.classList.toggle('is-active', btn.dataset.taskFilter === state.taskFilter);
-  });
-}
-
-function updateEditModeUi(){
-  document.body.classList.toggle("is-editing", state.editMode);
-  const editButton = $("#editModeButton");
-  if(editButton){
-    editButton.textContent = state.editMode ? "Sair da edição" : "Editar";
-    editButton.classList.toggle("is-active", state.editMode);
-  }
-}
-
-function render(){
-  renderHero();
-  renderKpis();
-  renderTasks();
-  renderCityFilter();
-  renderTimeline();
-  renderBookings();
-  renderDocuments();
-  updateEditModeUi();
+function init(){
+  bindEvents();
+  renderAll();
+  initMap();
+  setTimeout(renderMapMarkers, 300);
 }
 
 function bindEvents(){
-  $$(".filter").forEach(button => {
-    button.addEventListener("click", () => {
-      state.taskFilter = button.dataset.taskFilter;
-      renderTasks();
-    });
-  });
-
-  $("#cityFilter").addEventListener("change", (event) => {
-    state.cityFilter = event.target.value;
-    renderTimeline();
-  });
-
-  $("#printButton").addEventListener("click", () => window.print());
-
-  $("#editModeButton").addEventListener("click", () => {
-    state.editMode = !state.editMode;
-    localStorage.setItem(EDIT_MODE_KEY, String(state.editMode));
-    render();
-    showToast(state.editMode ? "Modo edição ativado." : "Modo edição desativado.");
-  });
-
-  $("#editTripButton").addEventListener("click", () => openTripEditor());
-  $("#addTaskButton").addEventListener("click", () => openItemEditor("task"));
-  $("#addDayButton").addEventListener("click", () => openItemEditor("day"));
-  $("#renumberDaysButton").addEventListener("click", renumberDays);
-  $("#addBookingButton").addEventListener("click", () => openItemEditor("booking"));
-  $("#addLinkButton").addEventListener("click", () => openItemEditor("link"));
-  $("#addDocumentButton").addEventListener("click", () => openItemEditor("document"));
-
-  $("#exportButton").addEventListener("click", exportData);
-  $("#importButton").addEventListener("click", () => $("#importFile").click());
-  $("#importFile").addEventListener("change", importDataFromFile);
-  $("#documentFileInput").addEventListener("change", handleDocumentFileSelected);
-  $("#resetButton").addEventListener("click", resetLocalData);
-
-  document.addEventListener("change", (event) => {
-    const input = event.target.closest("[data-task-check]");
-    if(!input) return;
-
-    const task = findById(state.data.tarefas, input.dataset.taskCheck);
-    if(!task) return;
-
-    task.status = input.checked ? "done" : "pending";
-    saveData(input.checked ? "Pendência concluída." : "Pendência reaberta.");
-  });
-
-  document.addEventListener("click", (event) => {
-    const actionButton = event.target.closest("[data-action]");
-    if(!actionButton) return;
-
-    const action = actionButton.dataset.action;
-    if(action === "closeModal") closeModal();
-    if(action === "edit") openItemEditor(actionButton.dataset.type, actionButton.dataset.id);
-    if(action === "delete") deleteItem(actionButton.dataset.type, actionButton.dataset.id);
-    if(action === "move") moveItem(actionButton.dataset.type, actionButton.dataset.id, actionButton.dataset.direction);
-    if(action === "duplicate") duplicateItem(actionButton.dataset.type, actionButton.dataset.id);
-    if(action === "uploadDocument") uploadDocumentFile(actionButton.dataset.id);
-    if(action === "downloadDocument") downloadDocumentFile(actionButton.dataset.id);
-    if(action === "removeDocumentFile") removeDocumentFile(actionButton.dataset.id);
-  });
-
-  $("#editorForm").addEventListener("submit", submitEditorForm);
-}
-
-function openTripEditor(){
-  state.currentEditor = {type:"trip"};
-  openModal("Editar dados da viagem", [
-    field("titulo", "Título", "text", state.data.viagem.titulo),
-    field("subtitulo", "Subtítulo", "textarea", state.data.viagem.subtitulo),
-    field("periodo", "Período", "text", state.data.viagem.periodo),
-    field("origem", "Base / origem", "text", state.data.viagem.origem),
-    field("pessoas", "Pessoas", "text", state.data.viagem.pessoas),
-    field("observacao", "Observação", "textarea", state.data.viagem.observacao)
-  ]);
-}
-
-function openItemEditor(type, id = null){
-  const config = entityConfig(type);
-  if(!config) return;
-
-  const collection = state.data[config.collection] || [];
-  const existing = id ? findById(collection, id) : null;
-  const item = existing || config.empty();
-
-  state.currentEditor = {type, id};
-  openModal(existing ? `Editar ${config.label}` : `Adicionar ${config.label}`, config.fields(item));
-}
-
-function entityConfig(type){
-  const statusOptions = [
-    {value:"pending", label:"Pendente"},
-    {value:"done", label:"Concluído"}
-  ];
-
-  const configs = {
-    task: {
-      label:"pendência",
-      collection:"tarefas",
-      empty: () => ({id:`task-${uid()}`, titulo:"", descricao:"", status:"pending", critica:false}),
-      fields: item => [
-        field("titulo", "Título", "text", item.titulo),
-        field("descricao", "Descrição", "textarea", item.descricao),
-        field("status", "Status", "select", item.status || "pending", statusOptions),
-        field("critica", "Marcar como crítica", "checkbox", Boolean(item.critica))
-      ]
-    },
-    day: {
-      label:"dia/evento",
-      collection:"dias",
-      empty: () => ({id:`day-${uid()}`, dia:`Dia ${(state.data.dias || []).length + 1}`, data:"", cidade:"", titulo:"", manha:"", tarde:"", noite:"", link:""}),
-      fields: item => [
-        field("dia", "Nome do dia", "text", item.dia),
-        field("data", "Data", "text", item.data),
-        field("cidade", "Cidade / etapa", "text", item.cidade),
-        field("titulo", "Título do dia", "text", item.titulo),
-        field("manha", "Agenda da manhã", "textarea", item.manha),
-        field("tarde", "Agenda da tarde", "textarea", item.tarde),
-        field("noite", "Agenda da noite", "textarea", item.noite),
-        field("link", "Link opcional do dia", "text", item.link)
-      ]
-    },
-    booking: {
-      label:"reserva",
-      collection:"reservas",
-      empty: () => ({id:`booking-${uid()}`, tipo:"", nome:"", detalhe:"", status:"pending"}),
-      fields: item => [
-        field("tipo", "Tipo", "text", item.tipo),
-        field("nome", "Nome", "text", item.nome),
-        field("detalhe", "Detalhes", "textarea", item.detalhe),
-        field("status", "Status", "select", item.status || "pending", statusOptions)
-      ]
-    },
-    link: {
-      label:"link",
-      collection:"links",
-      empty: () => ({id:`link-${uid()}`, titulo:"", descricao:"", url:"#"}),
-      fields: item => [
-        field("titulo", "Título", "text", item.titulo),
-        field("descricao", "Descrição", "textarea", item.descricao),
-        field("url", "URL", "text", item.url)
-      ]
-    },
-    document: {
-      label:"documento/arquivo",
-      collection:"documentos",
-      empty: () => ({id:`doc-${uid()}`, nome:"", detalhe:"", url:"", status:"pending", arquivo:null}),
-      fields: item => [
-        field("nome", "Nome", "text", item.nome),
-        field("detalhe", "Detalhes", "textarea", item.detalhe),
-        field("url", "Link externo opcional", "text", item.url),
-        field("status", "Status", "select", item.status || "pending", statusOptions)
-      ]
-    }
+  document.querySelectorAll(".nav-item").forEach(btn=>btn.addEventListener("click",()=>setView(btn.dataset.view)));
+  byId("btnAddPlace").onclick = () => openPlaceModal();
+  byId("btnAddPlace2").onclick = () => openPlaceModal();
+  byId("btnAddDay").onclick = () => openDayModal();
+  byId("btnAddDay2").onclick = () => openDayModal();
+  byId("btnEditTrip").onclick = openTripModal;
+  byId("btnAddTask").onclick = () => openTaskModal();
+  byId("btnAddReservation").onclick = () => openReservationModal();
+  byId("btnAddDocument").onclick = () => openDocumentModal();
+  byId("btnAddExpense").onclick = () => openExpenseModal();
+  byId("btnRenumberDays").onclick = () => { renumberDays(); saveAndRender(); };
+  byId("btnFitMap").onclick = fitMap;
+  byId("btnAddMapCenter").onclick = () => {
+    const c = map?.getCenter();
+    openPlaceModal(null, { lat: c?.lat || -34.6037, lng: c?.lng || -58.3816 });
   };
-
-  return configs[type];
+  byId("btnExport").onclick = exportJson;
+  byId("importJson").onchange = importJson;
+  byId("btnReset").onclick = resetData;
+  byId("modalClose").onclick = closeModal;
+  byId("modalCancel").onclick = closeModal;
+  byId("filterCity").onchange = renderPlaces;
+  byId("filterDay").onchange = renderPlaces;
+  byId("filterStatus").onchange = renderPlaces;
 }
 
-function field(name, label, type, value = "", options = []){
-  return {name, label, type, value, options};
+function setView(view){
+  currentView = view;
+  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active", b.dataset.view===view));
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active", v.id===`view-${view}`));
+  if(view === "places" || view === "itinerary") setTimeout(()=>map?.invalidateSize(), 150);
 }
 
-function openModal(title, fields){
-  $("#editorTitle").textContent = title;
-  $("#editorFields").innerHTML = fields.map(renderField).join("");
-  $("#editorModal").hidden = false;
-  document.body.classList.add("modal-open");
-
-  setTimeout(() => {
-    const firstInput = $("#editorFields input:not([type='checkbox']), #editorFields textarea, #editorFields select");
-    if(firstInput) firstInput.focus();
-  }, 60);
+function renderAll(){
+  renderHeader();
+  renderMetrics();
+  renderSidebarDays();
+  renderOverview();
+  renderItinerary();
+  renderFilters();
+  renderPlaces();
+  renderReservations();
+  renderDocuments();
+  renderBudget();
+  renderMapMarkers();
 }
+function saveAndRender(){ saveData(); renderAll(); }
 
-function renderField(item){
-  const value = item.type === "checkbox" ? Boolean(item.value) : escapeAttribute(item.value || "");
-
-  if(item.type === "textarea"){
+function renderHeader(){
+  byId("tripTitle").textContent = data.trip.title;
+  byId("tripSubtitle").textContent = data.trip.subtitle;
+  byId("sidebarSubtitle").textContent = data.trip.title.replace(" em família","");
+}
+function renderMetrics(){
+  const openTasks = data.tasks.filter(t=>!t.done);
+  const critical = openTasks.filter(t=>t.critical);
+  const expected = data.expenses.reduce((a,e)=>a+Number(e.expected||0),0) + data.reservations.reduce((a,r)=>a+Number(r.amount||0),0);
+  const paid = data.expenses.reduce((a,e)=>a+Number(e.paid||0),0);
+  byId("metricPeriod").textContent = data.trip.period;
+  byId("metricBase").textContent = `Base: ${data.trip.base}`;
+  byId("metricPlaces").textContent = data.places.length;
+  byId("metricOpenTasks").textContent = openTasks.length;
+  byId("metricCritical").textContent = `${critical.length} críticas`;
+  byId("metricBudget").textContent = formatCurrency(expected);
+  byId("metricPaid").textContent = `${formatCurrency(paid)} pago`;
+}
+function renderSidebarDays(){
+  byId("sidebarDays").innerHTML = data.days.map(d=>`
+    <button class="sidebar-day" data-dayjump="${d.id}"><span>Dia ${String(d.number).padStart(2,"0")}</span><small>${escapeHtml(d.date)}</small></button>
+  `).join("");
+  document.querySelectorAll("[data-dayjump]").forEach(btn=>btn.onclick=()=>{
+    setView("itinerary");
+    setTimeout(()=>document.querySelector(`[data-daycard="${btn.dataset.dayjump}"]`)?.scrollIntoView({behavior:"smooth",block:"start"}),100);
+  });
+}
+function renderOverview(){
+  const done = data.tasks.filter(t=>t.done).length;
+  const pct = data.tasks.length ? Math.round((done/data.tasks.length)*100) : 0;
+  const cityCounts = uniqueCities().map(city=>({ city, count:data.places.filter(p=>p.city===city).length }));
+  byId("overviewContent").innerHTML = `
+    <div class="overview-grid">
+      <div class="overview-box">
+        <h3>Progresso das pendências</h3>
+        <div class="progress-bar"><span style="width:${pct}%"></span></div>
+        <p class="muted">${done} de ${data.tasks.length} pendências concluídas.</p>
+        <div class="task-list">
+          ${data.tasks.map(task=>`
+            <div class="task-item">
+              <input type="checkbox" ${task.done?"checked":""} data-task-toggle="${task.id}" />
+              <div>
+                <strong>${escapeHtml(task.title)}</strong>
+                <span class="tag ${task.critical?"critical":"pending"}">${task.critical?"Crítico":"Pendente"}</span>
+                <p>${escapeHtml(task.description)}</p>
+                <div class="card-actions">
+                  <button class="ghost tiny" data-edit-task="${task.id}">Editar</button>
+                  <button class="ghost tiny danger" data-delete-task="${task.id}">Excluir</button>
+                </div>
+              </div>
+            </div>`).join("") || `<div class="empty-state">Nenhuma pendência cadastrada.</div>`}
+        </div>
+      </div>
+      <div class="overview-box">
+        <h3>Lugares por cidade</h3>
+        <div class="city-breakdown">
+          ${cityCounts.map(c=>`<div class="city-row"><strong>${escapeHtml(c.city)}</strong><span>${c.count} lugar(es)</span></div>`).join("") || `<p class="muted">Cadastre lugares para montar o mapa da viagem.</p>`}
+        </div>
+      </div>
+    </div>`;
+  document.querySelectorAll("[data-task-toggle]").forEach(el=>el.onchange=()=>{ const t=data.tasks.find(x=>x.id===el.dataset.taskToggle); if(t){t.done=el.checked; saveAndRender();}});
+  document.querySelectorAll("[data-edit-task]").forEach(el=>el.onclick=()=>openTaskModal(data.tasks.find(t=>t.id===el.dataset.editTask)));
+  document.querySelectorAll("[data-delete-task]").forEach(el=>el.onclick=()=>deleteItem("tasks", el.dataset.deleteTask));
+}
+function renderItinerary(){
+  byId("itineraryList").innerHTML = data.days.map((d, idx)=>{
+    const placesByPeriod = period => data.places.filter(p=>p.dayId===d.id && p.period===period);
+    const periodHtml = (title, key, note) => `
+      <div class="period">
+        <div class="period-title">${title}</div>
+        <div class="period-note">${escapeHtml(note)}</div>
+        ${placesByPeriod(key).map(p=>`
+          <div class="mini-place">
+            <span>📍</span>
+            <button data-select-place="${p.id}">${escapeHtml(p.name)}<small>${escapeHtml(p.category)} · ${statusLabel(p.status)}</small></button>
+          </div>
+        `).join("")}
+        <button class="ghost tiny" data-add-place-day="${d.id}" data-period="${key}">+ lugar neste período</button>
+      </div>`;
     return `
-      <label class="form-field full-field">
-        <span>${escapeHtml(item.label)}</span>
-        <textarea name="${escapeAttribute(item.name)}" rows="4">${escapeHtml(item.value || "")}</textarea>
-      </label>
-    `;
-  }
-
-  if(item.type === "select"){
-    return `
-      <label class="form-field">
-        <span>${escapeHtml(item.label)}</span>
-        <select name="${escapeAttribute(item.name)}">
-          ${item.options.map(option => `<option value="${escapeAttribute(option.value)}" ${option.value === item.value ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
-        </select>
-      </label>
-    `;
-  }
-
-  if(item.type === "checkbox"){
-    return `
-      <label class="form-field checkbox-field full-field">
-        <input type="checkbox" name="${escapeAttribute(item.name)}" ${value ? "checked" : ""} />
-        <span>${escapeHtml(item.label)}</span>
-      </label>
-    `;
-  }
-
-  return `
-    <label class="form-field">
-      <span>${escapeHtml(item.label)}</span>
-      <input type="text" name="${escapeAttribute(item.name)}" value="${value}" />
-    </label>
-  `;
+      <article class="day-card" data-daycard="${d.id}">
+        <div class="day-card-head">
+          <div>
+            <h3>Dia ${String(d.number).padStart(2,"0")} · ${escapeHtml(d.title)}</h3>
+            <small>${escapeHtml(d.label)} · ${escapeHtml(d.date)}</small>
+          </div>
+          <div class="day-actions">
+            <span class="tag city">${escapeHtml(d.city)}</span>
+            <button class="ghost tiny" data-move-day="${d.id}" data-dir="up" ${idx===0?"disabled":""}>↑</button>
+            <button class="ghost tiny" data-move-day="${d.id}" data-dir="down" ${idx===data.days.length-1?"disabled":""}>↓</button>
+            <button class="ghost tiny" data-duplicate-day="${d.id}">Duplicar</button>
+            <button class="ghost tiny" data-edit-day="${d.id}">Editar agenda</button>
+            <button class="ghost tiny danger" data-delete-day="${d.id}">Excluir</button>
+          </div>
+        </div>
+        <div class="day-body">
+          ${periodHtml("Manhã", "morning", d.morning)}
+          ${periodHtml("Tarde", "afternoon", d.afternoon)}
+          ${periodHtml("Noite", "night", d.night)}
+        </div>
+      </article>`;
+  }).join("");
+  document.querySelectorAll("[data-edit-day]").forEach(el=>el.onclick=()=>openDayModal(data.days.find(d=>d.id===el.dataset.editDay)));
+  document.querySelectorAll("[data-delete-day]").forEach(el=>el.onclick=()=>deleteDay(el.dataset.deleteDay));
+  document.querySelectorAll("[data-duplicate-day]").forEach(el=>el.onclick=()=>duplicateDay(el.dataset.duplicateDay));
+  document.querySelectorAll("[data-move-day]").forEach(el=>el.onclick=()=>moveDay(el.dataset.moveDay, el.dataset.dir));
+  document.querySelectorAll("[data-add-place-day]").forEach(el=>el.onclick=()=>openPlaceModal(null, { dayId:el.dataset.addPlaceDay, period:el.dataset.period }));
+  document.querySelectorAll("[data-select-place]").forEach(el=>el.onclick=()=>selectPlace(el.dataset.selectPlace, true));
+}
+function renderFilters(){
+  byId("filterCity").innerHTML = `<option value="all">Todas as cidades</option>` + uniqueCities().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  byId("filterDay").innerHTML = `<option value="all">Todos os dias</option><option value="none">Sem dia definido</option>` + data.days.map(d=>`<option value="${d.id}">Dia ${String(d.number).padStart(2,"0")} · ${escapeHtml(d.title)}</option>`).join("");
+}
+function renderPlaces(){
+  const city = byId("filterCity")?.value || "all";
+  const day = byId("filterDay")?.value || "all";
+  const status = byId("filterStatus")?.value || "all";
+  let list = data.places;
+  if(city!=="all") list = list.filter(p=>p.city===city);
+  if(day==="none") list = list.filter(p=>!p.dayId);
+  else if(day!=="all") list = list.filter(p=>p.dayId===day);
+  if(status!=="all") list = list.filter(p=>p.status===status);
+  byId("placesList").innerHTML = list.map(p=>`
+    <article class="place-card ${p.id===selectedPlaceId?"selected":""}">
+      <div class="place-top">
+        <div>
+          <h3>${escapeHtml(p.name)}</h3>
+          <div class="place-meta">
+            <span class="tag city">${escapeHtml(p.city)}</span>
+            <span class="tag ${p.status}">${statusLabel(p.status)}</span>
+            <span class="tag planned">${dayName(p.dayId)}</span>
+            <span class="tag wishlist">${periodLabel(p.period)}</span>
+          </div>
+        </div>
+        <button class="icon-btn" data-focus-place="${p.id}">⌖</button>
+      </div>
+      <p>${escapeHtml(p.notes || "Sem observações.")}</p>
+      <div class="card-actions">
+        <button class="ghost tiny" data-edit-place="${p.id}">Editar</button>
+        <button class="ghost tiny" data-copy-place="${p.id}">Duplicar</button>
+        ${p.url ? `<a class="ghost tiny" href="${escapeHtml(p.url)}" target="_blank" rel="noopener">Abrir mapa/link</a>` : ""}
+        <button class="ghost tiny danger" data-delete-place="${p.id}">Excluir</button>
+      </div>
+    </article>`).join("") || `<div class="empty-state">Nenhum lugar encontrado. Clique em + Novo lugar.</div>`;
+  document.querySelectorAll("[data-edit-place]").forEach(el=>el.onclick=()=>openPlaceModal(data.places.find(p=>p.id===el.dataset.editPlace)));
+  document.querySelectorAll("[data-delete-place]").forEach(el=>el.onclick=()=>deleteItem("places", el.dataset.deletePlace));
+  document.querySelectorAll("[data-copy-place]").forEach(el=>el.onclick=()=>duplicatePlace(el.dataset.copyPlace));
+  document.querySelectorAll("[data-focus-place]").forEach(el=>el.onclick=()=>selectPlace(el.dataset.focusPlace, true));
+}
+function renderReservations(){
+  byId("reservationsList").innerHTML = data.reservations.map(r=>`
+    <article class="generic-card">
+      <h3>${escapeHtml(r.title)}</h3>
+      <div class="place-meta"><span class="tag city">${escapeHtml(r.type)}</span><span class="tag pending">${escapeHtml(r.status)}</span><span class="tag wishlist">${escapeHtml(r.date||"Sem data")}</span></div>
+      <p>${escapeHtml(r.notes||"")}</p>
+      <p class="muted">Valor: ${formatCurrency(r.amount)}</p>
+      <div class="card-actions"><button class="ghost tiny" data-edit-res="${r.id}">Editar</button>${r.link?`<a class="ghost tiny" target="_blank" rel="noopener" href="${escapeHtml(r.link)}">Abrir link</a>`:""}<button class="ghost tiny danger" data-delete-res="${r.id}">Excluir</button></div>
+    </article>`).join("") || `<div class="empty-state">Nenhuma reserva cadastrada.</div>`;
+  document.querySelectorAll("[data-edit-res]").forEach(el=>el.onclick=()=>openReservationModal(data.reservations.find(r=>r.id===el.dataset.editRes)));
+  document.querySelectorAll("[data-delete-res]").forEach(el=>el.onclick=()=>deleteItem("reservations", el.dataset.deleteRes));
+}
+function renderDocuments(){
+  byId("documentsList").innerHTML = data.documents.map(doc=>`
+    <article class="generic-card">
+      <h3>${escapeHtml(doc.title)}</h3>
+      <div class="place-meta"><span class="tag city">${escapeHtml(doc.type)}</span><span class="tag pending">${escapeHtml(doc.status)}</span></div>
+      <p>${escapeHtml(doc.notes||"")}</p>
+      <div class="card-actions"><button class="ghost tiny" data-edit-doc="${doc.id}">Editar</button>${doc.link?`<a class="ghost tiny" target="_blank" rel="noopener" href="${escapeHtml(doc.link)}">Abrir arquivo/link</a>`:""}<button class="ghost tiny danger" data-delete-doc="${doc.id}">Excluir</button></div>
+    </article>`).join("") || `<div class="empty-state">Nenhum documento cadastrado.</div>`;
+  document.querySelectorAll("[data-edit-doc]").forEach(el=>el.onclick=()=>openDocumentModal(data.documents.find(d=>d.id===el.dataset.editDoc)));
+  document.querySelectorAll("[data-delete-doc]").forEach(el=>el.onclick=()=>deleteItem("documents", el.dataset.deleteDoc));
+}
+function renderBudget(){
+  const rows = data.expenses.map(e=>`
+    <tr><td><strong>${escapeHtml(e.title)}</strong><br><small>${escapeHtml(e.category)} · ${escapeHtml(e.city||"")}</small></td><td>${formatCurrency(e.expected)}</td><td>${formatCurrency(e.paid)}</td><td>${escapeHtml(e.date||"-")}</td><td><button class="ghost tiny" data-edit-exp="${e.id}">Editar</button> <button class="ghost tiny danger" data-delete-exp="${e.id}">Excluir</button></td></tr>`).join("");
+  byId("budgetContent").innerHTML = `<table class="budget-table"><thead><tr><th>Item</th><th>Previsto</th><th>Pago</th><th>Data</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table>`;
+  document.querySelectorAll("[data-edit-exp]").forEach(el=>el.onclick=()=>openExpenseModal(data.expenses.find(e=>e.id===el.dataset.editExp)));
+  document.querySelectorAll("[data-delete-exp]").forEach(el=>el.onclick=()=>deleteItem("expenses", el.dataset.deleteExp));
 }
 
-function submitEditorForm(event){
-  event.preventDefault();
-  if(!state.currentEditor) return;
-
-  const form = new FormData(event.currentTarget);
-  const type = state.currentEditor.type;
-
-  if(type === "trip"){
-    state.data.viagem = {
-      titulo: clean(form.get("titulo")),
-      subtitulo: clean(form.get("subtitulo")),
-      periodo: clean(form.get("periodo")),
-      origem: clean(form.get("origem")),
-      pessoas: clean(form.get("pessoas")),
-      observacao: clean(form.get("observacao"))
-    };
-    closeModal();
-    saveData("Dados da viagem salvos.");
+function initMap(){
+  if(!window.L){
+    byId("map").innerHTML = `<div class="empty-state">Mapa indisponível. Verifique a conexão para carregar a biblioteca Leaflet.</div>`;
     return;
   }
-
-  const config = entityConfig(type);
-  if(!config) return;
-
-  const collection = state.data[config.collection] || [];
-  const item = collectItemFromForm(type, form, state.currentEditor.id);
-
-  if(state.currentEditor.id){
-    const index = collection.findIndex(entry => entry.id === state.currentEditor.id);
-    if(index >= 0) collection[index] = {...collection[index], ...item, id: state.currentEditor.id};
-  }else{
-    collection.push(item);
+  map = L.map("map", { zoomControl:true }).setView([-31.7, -63.8], 4);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:19, attribution:"&copy; OpenStreetMap" }).addTo(map);
+  markersLayer = L.layerGroup().addTo(map);
+  map.on("click", (e)=>{ byId("mapHint").textContent = `Clique em '+ no centro' para adicionar lugar próximo a ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}.`; });
+}
+function renderMapMarkers(){
+  if(!map || !markersLayer) return;
+  markersLayer.clearLayers();
+  data.places.filter(p=>Number(p.lat)&&Number(p.lng)).forEach(p=>{
+    const marker = L.marker([Number(p.lat), Number(p.lng)]).addTo(markersLayer);
+    marker.bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>${escapeHtml(p.city)}<br>${statusLabel(p.status)}<br><button onclick="window.__selectPlaceFromMap('${p.id}')">Selecionar</button>`);
+    marker.on("click",()=>selectPlace(p.id, false));
+  });
+}
+window.__selectPlaceFromMap = (id)=>selectPlace(id, false);
+function fitMap(){
+  if(!map) return;
+  const coords = data.places.filter(p=>Number(p.lat)&&Number(p.lng)).map(p=>[Number(p.lat), Number(p.lng)]);
+  if(!coords.length) return;
+  map.fitBounds(coords, { padding:[50,50], maxZoom:11 });
+}
+function selectPlace(id, zoom){
+  selectedPlaceId = id;
+  const p = data.places.find(x=>x.id===id);
+  if(!p) return;
+  byId("placeDetail").innerHTML = `
+    <strong>${escapeHtml(p.name)}</strong>
+    <p>${escapeHtml(p.city)} · ${escapeHtml(p.category)} · ${statusLabel(p.status)}</p>
+    <p><b>Agenda:</b> ${dayName(p.dayId)} · ${periodLabel(p.period)}</p>
+    <p>${escapeHtml(p.notes||"")}</p>
+    <div class="card-actions"><button class="ghost tiny" onclick="openPlaceModal(data.places.find(p=>p.id==='${p.id}'))">Editar</button>${p.url?`<a class="ghost tiny" href="${escapeHtml(p.url)}" target="_blank" rel="noopener">Abrir link</a>`:""}</div>`;
+  if(map && Number(p.lat)&&Number(p.lng)){
+    map.setView([Number(p.lat), Number(p.lng)], zoom ? 13 : map.getZoom());
   }
-
-  state.data[config.collection] = collection;
-  closeModal();
-  saveData("Item salvo.");
+  renderPlaces();
 }
 
-function collectItemFromForm(type, form, existingId){
-  const id = existingId || `${type}-${uid()}`;
+function openModal(title, html, onSubmit){
+  byId("modalTitle").textContent = title;
+  byId("modalBody").innerHTML = html;
+  byId("modalForm").onsubmit = (ev)=>{ ev.preventDefault(); onSubmit(new FormData(ev.currentTarget)); closeModal(); saveAndRender(); };
+  byId("modal").showModal();
+}
+function closeModal(){ byId("modal").close(); }
+const input = (name,label,value="",type="text",extra="") => `<label>${label}<input name="${name}" type="${type}" value="${escapeHtml(value)}" ${extra}></label>`;
+const textarea = (name,label,value="") => `<label>${label}<textarea name="${name}">${escapeHtml(value)}</textarea></label>`;
+const select = (name,label,options,value="") => `<label>${label}<select name="${name}">${options.map(o=>`<option value="${escapeHtml(o.value)}" ${String(o.value)===String(value)?"selected":""}>${escapeHtml(o.label)}</option>`).join("")}</select></label>`;
+const dayOptions = () => [{value:"",label:"Sem dia definido"}, ...data.days.map(d=>({value:d.id,label:`Dia ${String(d.number).padStart(2,"0")} · ${d.title}`}))];
 
-  if(type === "task"){
-    return {
-      id,
-      titulo: clean(form.get("titulo")) || "Nova pendência",
-      descricao: clean(form.get("descricao")),
-      status: clean(form.get("status")) || "pending",
-      critica: form.has("critica")
-    };
-  }
-
-  if(type === "day"){
-    return {
-      id,
-      dia: clean(form.get("dia")) || "Novo dia",
-      data: clean(form.get("data")),
-      cidade: clean(form.get("cidade")) || "Roteiro",
-      titulo: clean(form.get("titulo")) || "A definir",
-      manha: clean(form.get("manha")),
-      tarde: clean(form.get("tarde")),
-      noite: clean(form.get("noite")),
-      link: clean(form.get("link"))
-    };
-  }
-
-  if(type === "booking"){
-    return {
-      id,
-      tipo: clean(form.get("tipo")),
-      nome: clean(form.get("nome")) || "Nova reserva",
-      detalhe: clean(form.get("detalhe")),
-      status: clean(form.get("status")) || "pending"
-    };
-  }
-
-  if(type === "link"){
-    return {
-      id,
-      titulo: clean(form.get("titulo")) || "Novo link",
-      descricao: clean(form.get("descricao")),
-      url: clean(form.get("url")) || "#"
-    };
-  }
-
-  if(type === "document"){
-    return {
-      id,
-      nome: clean(form.get("nome")) || "Novo documento",
-      detalhe: clean(form.get("detalhe")),
-      url: clean(form.get("url")),
-      status: clean(form.get("status")) || "pending"
-    };
-  }
-
-  return {id};
+function openTripModal(){
+  const t = data.trip;
+  openModal("Editar viagem", `<div class="form-grid">${input("title","Título",t.title)}${input("period","Período",t.period)}${input("base","Base inicial",t.base)}${input("people","Pessoas",t.people)}<div class="full">${textarea("subtitle","Descrição",t.subtitle)}</div></div>`, fd=>{
+    data.trip = { title:fd.get("title"), period:fd.get("period"), base:fd.get("base"), people:fd.get("people"), subtitle:fd.get("subtitle") };
+  });
+}
+function openDayModal(day){
+  const d = day || { id:uid(), number:data.days.length+1, label:"", date:"", title:"Novo dia", city:"", morning:"", afternoon:"", night:"" };
+  openModal(day?"Editar agenda do dia":"Novo dia / evento", `<div class="form-grid">
+    ${input("number","Número do dia",d.number,"number")} ${input("label","Rótulo lateral",d.label)}
+    ${input("date","Data",d.date)} ${input("city","Cidade/etapa",d.city)}
+    <div class="full">${input("title","Título do dia",d.title)}</div>
+    <div class="full">${textarea("morning","Manhã",d.morning)}</div>
+    <div class="full">${textarea("afternoon","Tarde",d.afternoon)}</div>
+    <div class="full">${textarea("night","Noite",d.night)}</div>
+  </div>`, fd=>{
+    const payload = { id:d.id, number:Number(fd.get("number")||1), label:fd.get("label"), date:fd.get("date"), title:fd.get("title"), city:fd.get("city"), morning:fd.get("morning"), afternoon:fd.get("afternoon"), night:fd.get("night") };
+    if(day) Object.assign(day, payload); else data.days.push(payload);
+    data.days.sort((a,b)=>a.number-b.number);
+  });
+}
+function openPlaceModal(place, defaults={}){
+  const centerByCity = defaults.city && cityCoords[defaults.city] ? cityCoords[defaults.city] : null;
+  const p = place || { id:uid(), name:"", city:defaults.city||"", category:"Passeio", status:"wishlist", dayId:defaults.dayId||"", period:defaults.period||"free", lat:defaults.lat || centerByCity?.[0] || "", lng:defaults.lng || centerByCity?.[1] || "", priority:"Média", notes:"", url:"" };
+  openModal(place?"Editar lugar":"Novo lugar para visitar", `<div class="form-grid">
+    ${input("name","Nome do lugar",p.name)}${input("city","Cidade",p.city)}
+    ${input("category","Categoria",p.category)}${select("status","Status",[{value:"wishlist",label:"Quero visitar"},{value:"planned",label:"Planejado no roteiro"},{value:"booked",label:"Reservado"},{value:"done",label:"Concluído"},{value:"discarded",label:"Descartado"}],p.status)}
+    ${select("dayId","Vincular em qual dia?",dayOptions(),p.dayId)}${select("period","Período",[{value:"free",label:"Sem período"},{value:"morning",label:"Manhã"},{value:"afternoon",label:"Tarde"},{value:"night",label:"Noite"}],p.period)}
+    ${input("lat","Latitude",p.lat,"number",'step="any"')}${input("lng","Longitude",p.lng,"number",'step="any"')}
+    ${input("priority","Prioridade",p.priority)}<div class="full">${input("url","Link Google Maps/site",p.url,"url")}</div>
+    <div class="full">${textarea("notes","Observações",p.notes)}</div>
+    <div class="full field-help">Dica: para marcar no mapa, cole latitude/longitude do Google Maps ou use o botão “+ no centro” no mapa.</div>
+  </div>`, fd=>{
+    const payload = { id:p.id, name:fd.get("name"), city:fd.get("city"), category:fd.get("category"), status:fd.get("status"), dayId:fd.get("dayId"), period:fd.get("period"), lat:fd.get("lat"), lng:fd.get("lng"), priority:fd.get("priority"), url:fd.get("url"), notes:fd.get("notes") };
+    if(place) Object.assign(place, payload); else data.places.push(payload);
+    selectedPlaceId = payload.id;
+  });
+}
+function openTaskModal(task){
+  const t = task || { id:uid(), title:"", description:"", critical:false, done:false };
+  openModal(task?"Editar pendência":"Nova pendência", `<div class="form-grid"><div class="full">${input("title","Título",t.title)}</div><div class="full">${textarea("description","Descrição",t.description)}</div>${select("critical","Criticidade",[{value:"false",label:"Normal"},{value:"true",label:"Crítica"}],String(t.critical))}${select("done","Status",[{value:"false",label:"Pendente"},{value:"true",label:"Concluído"}],String(t.done))}</div>`, fd=>{
+    const payload = { id:t.id, title:fd.get("title"), description:fd.get("description"), critical:fd.get("critical")==="true", done:fd.get("done")==="true" };
+    if(task) Object.assign(task,payload); else data.tasks.push(payload);
+  });
+}
+function openReservationModal(res){
+  const r = res || { id:uid(), type:"Hospedagem", title:"", status:"Pendente", date:"", amount:0, link:"", notes:"" };
+  openModal(res?"Editar reserva":"Nova reserva", `<div class="form-grid">${input("type","Tipo",r.type)}${input("status","Status",r.status)}<div class="full">${input("title","Título",r.title)}</div>${input("date","Data",r.date)}${input("amount","Valor",r.amount,"number",'step="0.01"')}<div class="full">${input("link","Link",r.link,"url")}</div><div class="full">${textarea("notes","Observações",r.notes)}</div></div>`, fd=>{
+    const payload = { id:r.id, type:fd.get("type"), status:fd.get("status"), title:fd.get("title"), date:fd.get("date"), amount:Number(fd.get("amount")||0), link:fd.get("link"), notes:fd.get("notes") };
+    if(res) Object.assign(res,payload); else data.reservations.push(payload);
+  });
+}
+function openDocumentModal(doc){
+  const d = doc || { id:uid(), title:"", type:"PDF/Imagem", status:"Pendente", link:"", notes:"" };
+  openModal(doc?"Editar documento":"Novo documento", `<div class="form-grid">${input("title","Título",d.title)}${input("type","Tipo",d.type)}${input("status","Status",d.status)}<div class="full">${input("link","Link do arquivo Drive/OneDrive",d.link,"url")}</div><div class="full">${textarea("notes","Observações",d.notes)}</div></div>`, fd=>{
+    const payload = { id:d.id, title:fd.get("title"), type:fd.get("type"), status:fd.get("status"), link:fd.get("link"), notes:fd.get("notes") };
+    if(doc) Object.assign(doc,payload); else data.documents.push(payload);
+  });
+}
+function openExpenseModal(exp){
+  const e = exp || { id:uid(), category:"", title:"", city:"", expected:0, paid:0, date:"", notes:"" };
+  openModal(exp?"Editar despesa":"Nova despesa", `<div class="form-grid">${input("category","Categoria",e.category)}${input("city","Cidade",e.city)}<div class="full">${input("title","Título",e.title)}</div>${input("expected","Valor previsto",e.expected,"number",'step="0.01"')}${input("paid","Valor pago",e.paid,"number",'step="0.01"')}${input("date","Data",e.date)}<div class="full">${textarea("notes","Observações",e.notes)}</div></div>`, fd=>{
+    const payload = { id:e.id, category:fd.get("category"), city:fd.get("city"), title:fd.get("title"), expected:Number(fd.get("expected")||0), paid:Number(fd.get("paid")||0), date:fd.get("date"), notes:fd.get("notes") };
+    if(exp) Object.assign(exp,payload); else data.expenses.push(payload);
+  });
 }
 
-async function deleteItem(type, id){
-  const config = entityConfig(type);
-  if(!config || !id) return;
-
-  const item = findById(state.data[config.collection], id);
-  const label = item?.titulo || item?.nome || item?.dia || item?.tipo || "este item";
-
-  if(!confirm(`Excluir "${label}"?`)) return;
-
-  if(type === "document" && item?.arquivo?.fileId){
-    await deleteStoredFile(item.arquivo.fileId);
-  }
-
-  state.data[config.collection] = (state.data[config.collection] || []).filter(entry => entry.id !== id);
-  saveData("Item excluído.");
+function deleteItem(collection, id){
+  if(!confirm("Excluir este item?")) return;
+  data[collection] = data[collection].filter(x=>x.id!==id);
+  if(collection==="places" && selectedPlaceId===id) selectedPlaceId=null;
+  saveAndRender();
 }
-
-function moveItem(type, id, direction){
-  const config = entityConfig(type);
-  if(!config || !id) return;
-
-  const collection = state.data[config.collection] || [];
-  const index = collection.findIndex(item => item.id === id);
-  if(index < 0) return;
-
-  const target = direction === "up" ? index - 1 : index + 1;
-  if(target < 0 || target >= collection.length) return;
-
-  [collection[index], collection[target]] = [collection[target], collection[index]];
-  saveData(direction === "up" ? "Item movido para cima." : "Item movido para baixo.");
+function deleteDay(id){
+  if(!confirm("Excluir este dia? Os lugares vinculados ficarão sem dia definido.")) return;
+  data.days = data.days.filter(d=>d.id!==id);
+  data.places.forEach(p=>{ if(p.dayId===id){ p.dayId=""; p.period="free"; }});
+  renumberDays(); saveAndRender();
 }
-
-function duplicateItem(type, id){
-  const config = entityConfig(type);
-  if(!config || !id) return;
-
-  const collection = state.data[config.collection] || [];
-  const index = collection.findIndex(item => item.id === id);
-  if(index < 0) return;
-
-  const copy = structuredCloneSafe(collection[index]);
-  copy.id = `${type}-${uid()}`;
-  if(copy.dia) copy.dia = `${copy.dia} cópia`;
-  if(copy.titulo) copy.titulo = `${copy.titulo} cópia`;
-  if(copy.nome) copy.nome = `${copy.nome} cópia`;
-  if(type === "document") copy.arquivo = null;
-
-  collection.splice(index + 1, 0, copy);
-  saveData("Item duplicado.");
+function duplicateDay(id){
+  const d = data.days.find(x=>x.id===id); if(!d) return;
+  const copy = { ...d, id:uid(), number:data.days.length+1, title:d.title + " — cópia" };
+  data.days.push(copy); renumberDays(); saveAndRender();
 }
-
-function renumberDays(){
-  if(!confirm("Renumerar os dias conforme a ordem atual dos cartões?")) return;
-
-  state.data.dias = (state.data.dias || []).map((day, index) => ({
-    ...day,
-    dia: `Dia ${String(index + 1).padStart(2, "0")}`
-  }));
-
-  saveData("Dias renumerados.");
+function moveDay(id, dir){
+  const idx = data.days.findIndex(d=>d.id===id); if(idx<0) return;
+  const target = dir==="up" ? idx-1 : idx+1;
+  if(target<0 || target>=data.days.length) return;
+  [data.days[idx], data.days[target]] = [data.days[target], data.days[idx]];
+  renumberDays(); saveAndRender();
 }
-
-function closeModal(){
-  $("#editorModal").hidden = true;
-  document.body.classList.remove("modal-open");
-  state.currentEditor = null;
-  $("#editorForm").reset();
+function renumberDays(){ data.days.forEach((d,i)=>d.number=i+1); }
+function duplicatePlace(id){
+  const p = data.places.find(x=>x.id===id); if(!p) return;
+  data.places.push({ ...p, id:uid(), name:p.name + " — cópia", status:"wishlist", dayId:"", period:"free" });
+  saveAndRender();
 }
-
-function exportData(){
-  const blob = new Blob([JSON.stringify(state.data, null, 2)], {type:"application/json"});
+function exportJson(){
+  const blob = new Blob([JSON.stringify(data,null,2)], { type:"application/json" });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  const today = new Date().toISOString().slice(0,10);
-  link.href = url;
-  link.download = `viagem-editada-${today}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+  const a = document.createElement("a"); a.href = url; a.download = "central-viagem-dados.json"; a.click();
   URL.revokeObjectURL(url);
-  showToast("JSON exportado.");
 }
-
-function importDataFromFile(event){
-  const file = event.target.files?.[0];
-  event.target.value = "";
-  if(!file) return;
-
+function importJson(ev){
+  const file = ev.target.files?.[0]; if(!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
-    try{
-      const imported = JSON.parse(reader.result);
-      state.data = imported;
-      ensureDataShape();
-      saveData("JSON importado e salvo neste navegador.");
-    }catch(error){
-      alert("Não consegui ler esse JSON. Verifique o arquivo e tente novamente.");
-      console.error(error);
-    }
-  };
+  reader.onload = () => { try{ data = JSON.parse(reader.result); saveAndRender(); alert("Dados importados com sucesso."); }catch(e){ alert("Arquivo JSON inválido."); } };
   reader.readAsText(file);
+  ev.target.value = "";
+}
+function resetData(){
+  if(!confirm("Resetar dados locais e voltar para o modelo inicial?")) return;
+  localStorage.removeItem(STORAGE_KEY); data = structuredClone(defaultData); selectedPlaceId=null; renderAll(); fitMap();
 }
 
-function resetLocalData(){
-  if(!confirm("Resetar as edições salvas neste navegador e voltar para a base do GitHub? Isso também remove arquivos enviados localmente neste aparelho.")) return;
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(LEGACY_CHECKED_KEY);
-
-  try{
-    if(window.indexedDB) indexedDB.deleteDatabase(FILE_DB_NAME);
-  }catch(error){
-    console.warn("Não foi possível apagar o banco local de arquivos.", error);
-  }
-
-  showToast("Edições locais removidas. Recarregando...");
-  setTimeout(() => window.location.reload(), 500);
-}
-
-async function uploadDocumentFile(documentId){
-  const doc = findById(state.data.documentos, documentId);
-  if(!doc) return;
-
-  state.pendingDocumentUploadId = documentId;
-  const input = $("#documentFileInput");
-  input.value = "";
-  input.click();
-}
-
-async function handleDocumentFileSelected(event){
-  const file = event.target.files?.[0];
-  const documentId = state.pendingDocumentUploadId;
-  state.pendingDocumentUploadId = null;
-  event.target.value = "";
-
-  if(!file || !documentId) return;
-
-  const doc = findById(state.data.documentos, documentId);
-  if(!doc) return;
-
-  if(file.size > 25 * 1024 * 1024){
-    alert("Arquivo muito grande para guardar no navegador. Tente usar até 25 MB ou salve em uma pasta do Google Drive e cole o link.");
-    return;
-  }
-
-  if(doc.arquivo?.fileId){
-    await deleteStoredFile(doc.arquivo.fileId);
-  }
-
-  const fileId = `file-${uid()}`;
-  await saveStoredFile(fileId, file);
-
-  doc.arquivo = {
-    fileId,
-    nome: file.name,
-    tipo: file.type || "application/octet-stream",
-    tamanho: file.size,
-    enviadoEm: new Date().toLocaleDateString("pt-BR")
-  };
-  doc.status = "done";
-
-  saveData("Arquivo enviado e salvo neste navegador.");
-}
-
-async function downloadDocumentFile(documentId){
-  const doc = findById(state.data.documentos, documentId);
-  if(!doc?.arquivo?.fileId) return;
-
-  const record = await getStoredFile(doc.arquivo.fileId);
-  if(!record?.blob){
-    alert("Não encontrei este arquivo neste navegador. Se ele foi importado via JSON, o JSON guarda os dados, mas não carrega o arquivo em si.");
-    return;
-  }
-
-  const url = URL.createObjectURL(record.blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = doc.arquivo.nome || record.name || "documento";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
-async function removeDocumentFile(documentId){
-  const doc = findById(state.data.documentos, documentId);
-  if(!doc?.arquivo?.fileId) return;
-
-  if(!confirm(`Remover o arquivo de "${doc.nome}" deste navegador?`)) return;
-
-  await deleteStoredFile(doc.arquivo.fileId);
-  doc.arquivo = null;
-  doc.status = "pending";
-  saveData("Arquivo removido.");
-}
-
-function openFilesDb(){
-  return new Promise((resolve, reject) => {
-    if(!window.indexedDB){
-      reject(new Error("Este navegador não suporta IndexedDB."));
-      return;
-    }
-
-    const request = indexedDB.open(FILE_DB_NAME, 1);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if(!db.objectStoreNames.contains(FILE_STORE_NAME)){
-        db.createObjectStore(FILE_STORE_NAME, {keyPath:"id"});
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function saveStoredFile(id, file){
-  const db = await openFilesDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(FILE_STORE_NAME, "readwrite");
-    tx.objectStore(FILE_STORE_NAME).put({
-      id,
-      name:file.name,
-      type:file.type,
-      size:file.size,
-      savedAt:new Date().toISOString(),
-      blob:file
-    });
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
-}
-
-async function getStoredFile(id){
-  const db = await openFilesDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(FILE_STORE_NAME, "readonly");
-    const request = tx.objectStore(FILE_STORE_NAME).get(id);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-    tx.oncomplete = () => db.close();
-  });
-}
-
-async function deleteStoredFile(id){
-  if(!id || !window.indexedDB) return;
-
-  const db = await openFilesDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(FILE_STORE_NAME, "readwrite");
-    tx.objectStore(FILE_STORE_NAME).delete(id);
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
-}
-
-function formatBytes(bytes){
-  const size = Number(bytes || 0);
-  if(size < 1024) return `${size} B`;
-  if(size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function findById(collection, id){
-  return (collection || []).find(item => item.id === id);
-}
-
-function uid(){
-  if(window.crypto?.randomUUID) return window.crypto.randomUUID().slice(0,8);
-  return Math.random().toString(36).slice(2,10);
-}
-
-function clean(value){
-  return String(value ?? "").trim();
-}
-
-function showToast(message){
-  const toast = $("#toast");
-  if(!toast) return;
-  toast.textContent = message;
-  toast.classList.add("is-visible");
-  clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => toast.classList.remove("is-visible"), 2600);
-}
-
-function safeHref(value){
-  const safe = String(value ?? "#").trim();
-  if(!safe || safe === "#") return "#";
-  if(safe.startsWith("http://") || safe.startsWith("https://") || safe.startsWith("mailto:")) {
-    return escapeAttribute(safe);
-  }
-  return "#";
-}
-
-function escapeHtml(value){
-  return String(value ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-function escapeAttribute(value){
-  const safe = String(value ?? "").trim();
-  return escapeHtml(safe);
-}
-
-bindEvents();
-loadData();
+init();

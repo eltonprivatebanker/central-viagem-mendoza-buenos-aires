@@ -65,3 +65,11 @@ Pendencias
 ```
 
 Depois criar um Apps Script para ler e gravar essas abas a partir da página.
+
+
+## v5.1 — correção do modal inicial
+
+Correção aplicada:
+- o modal base de edição não aparece mais ao carregar a página;
+- adicionado CSS `[hidden]{display:none!important;}` para impedir que `.modal-backdrop{display:grid}` sobrescreva o atributo `hidden`;
+- `index.html` passou a chamar `style.css` e `app.js` com versão `v5-1-modal-fix`, reduzindo risco de cache antigo no GitHub Pages.

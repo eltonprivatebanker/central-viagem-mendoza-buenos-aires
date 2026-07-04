@@ -16,6 +16,15 @@
   --radius:24px;
 }
 *{box-sizing:border-box}
+/* v5.1 — correção crítica: elementos com atributo hidden devem realmente sumir.
+   Sem esta regra, o CSS .modal-backdrop{display:grid} pode sobrescrever o hidden
+   e fazer o modal de edição aparecer aberto ao carregar a página. */
+[hidden],
+.modal-backdrop[hidden],
+.toast[hidden]{
+  display:none !important;
+}
+
 html{scroll-behavior:smooth}
 body{margin:0;background:linear-gradient(135deg,#07111f 0%,#0b1628 48%,#111c2d 100%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}
 button,input,textarea,select{font:inherit}

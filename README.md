@@ -1,72 +1,63 @@
-# Central de Viagem — Mendoza & Buenos Aires v2 Editável
+# Central de Viagem — Mendoza & Buenos Aires — v3 Sistema
 
-Projeto estático em HTML, CSS e JavaScript para organizar uma viagem com:
+Projeto estático em HTML, CSS e JavaScript para organizar a viagem com aparência de sistema.
 
-- visão geral;
-- roteiro por dia;
-- períodos de manhã, tarde e noite;
-- pendências;
-- reservas;
-- links úteis;
-- documentos;
-- progresso geral.
+## O que esta versão permite
 
-## Novidade da v2
+- Editar a capa da viagem pela própria tela.
+- Adicionar, editar, duplicar, mover, excluir e renumerar dias do roteiro.
+- Editar a agenda de cada dia por manhã, tarde e noite.
+- Adicionar, editar e excluir pendências.
+- Adicionar, editar e excluir reservas/deslocamentos.
+- Adicionar, editar e excluir links úteis.
+- Adicionar documentos, anexar arquivos do computador e baixar depois.
+- Exportar/importar JSON dos dados textuais.
+- Salvar as alterações no próprio navegador.
 
-Agora a página permite editar pela própria tela:
+## Importante sobre os arquivos enviados
 
-- editar dados da capa;
-- adicionar, editar e excluir pendências;
-- adicionar, editar e excluir dias/eventos do roteiro;
-- adicionar, editar e excluir reservas;
-- adicionar, editar e excluir links úteis;
-- adicionar, editar e excluir documentos;
-- marcar pendências como concluídas;
-- exportar JSON com a versão editada;
-- importar JSON salvo anteriormente;
-- resetar a base local.
+Como o GitHub Pages é um site estático, ele não grava arquivos de volta no GitHub sozinho.
 
-## Como funciona o salvamento
+Nesta versão, quando você envia um PDF/imagem/arquivo na área de documentos, ele fica salvo no navegador/aparelho usando IndexedDB. Isso permite baixar depois no mesmo navegador.
 
-Como o GitHub Pages é estático, a página não consegue alterar automaticamente o arquivo `dados/viagem.json` dentro do repositório.
+Limitações:
 
-Por isso, as edições feitas na tela são salvas no próprio navegador usando `localStorage`.
-
-Isso significa:
-
-- ao atualizar a página, os dados continuam salvos naquele navegador;
-- os dados não aparecem automaticamente em outro computador/celular;
-- para guardar uma cópia, use **Exportar JSON**;
-- para levar os dados para outro navegador, use **Importar JSON**;
-- para atualizar a base oficial do GitHub, substitua o arquivo `dados/viagem.json` pelo JSON exportado.
+- Se abrir em outro computador/celular, o arquivo enviado localmente não aparece.
+- O JSON exportado guarda os dados e metadados, mas não leva o arquivo anexado junto.
+- Para acesso familiar em vários aparelhos, use links externos de Google Drive/OneDrive ou evolua para backend como Supabase/Firebase/Google Sheets + Apps Script.
 
 ## Estrutura
 
-```txt
-central-viagem-mendoza-buenos-aires/
-├── index.html
-├── style.css
-├── app.js
-├── .nojekyll
-└── dados/
-    └── viagem.json
+```text
+index.html
+style.css
+app.js
+.nojekyll
+dados/
+  viagem.json
 ```
 
 ## Como publicar no GitHub Pages
 
-1. Envie todos os arquivos para a raiz do repositório.
-2. Vá em **Settings → Pages**.
-3. Em **Build and deployment**, escolha **Deploy from a branch**.
-4. Selecione a branch `main` e a pasta `/root`.
+1. Envie os arquivos para a raiz do repositório.
+2. Vá em Settings → Pages.
+3. Escolha Deploy from a branch.
+4. Selecione main e /(root).
 5. Salve e aguarde a publicação.
+
+## Como editar no site
+
+1. Clique em **Editar** no topo.
+2. Nos cartões do roteiro, clique em **Editar agenda**.
+3. Edite Dia 01, data, cidade, título, manhã, tarde e noite.
+4. Use as setas ↑ ↓ para reorganizar a ordem.
+5. Use **Renumerar dias** para atualizar Dia 01, Dia 02, Dia 03 conforme a ordem atual.
 
 ## Próxima evolução possível
 
-Para virar um sistema completo, com dados sincronizados entre celular e computador, será necessário usar um backend, por exemplo:
+Para transformar em sistema multiusuário real:
 
-- Supabase;
-- Firebase;
-- Google Sheets + Apps Script;
-- GitHub API com autenticação.
-
-Esta v2 é a melhor evolução sem backend: visual, editável e persistente no navegador.
+- Google Sheets + Apps Script para dados simples;
+- Supabase para banco e armazenamento de arquivos;
+- Firebase para autenticação, banco e storage;
+- GitHub API para gravar JSON no repositório com login/token.

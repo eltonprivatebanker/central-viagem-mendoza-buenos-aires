@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Central de Viagem Editável · Mendoza & Buenos Aires</title>
+  <title>Central de Viagem Sistema · Mendoza & Buenos Aires</title>
   <meta name="description" content="Planner visual de viagem com roteiro por dia, reservas, pendências, documentos e progresso." />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -97,7 +97,8 @@
         </div>
 
 <div class="section-actions mixed-actions">
-          <button class="primary-button edit-only" type="button" id="addDayButton">+ Dia/evento</button>
+          <button class="primary-button edit-only" type="button" id="addDayButton">+ Novo dia</button>
+          <button class="ghost-button edit-only" type="button" id="renumberDaysButton">Renumerar dias</button>
           <label class="select-label">
             Cidade
             <select id="cityFilter">
@@ -107,6 +108,7 @@
         </div>
       </div>
 
+      <p class="edit-hint edit-only">Dica: ative o modo edição, clique em <strong>Editar agenda</strong> no cartão do dia e altere Dia 01, data, cidade, manhã, tarde e noite. Use as setas para reorganizar a ordem.</p>
       <div class="timeline" id="timeline"></div>
     </section>
 
@@ -142,7 +144,7 @@
           <span class="section-kicker">Checklist</span>
           <h2>Documentos e arquivos</h2>
         </div>
-        <button class="primary-button edit-only" type="button" id="addDocumentButton">+ Documento</button>
+        <button class="primary-button edit-only" type="button" id="addDocumentButton">+ Documento/arquivo</button>
       </div>
 
       <div class="document-grid" id="documentGrid"></div>
@@ -172,10 +174,11 @@
   </div>
 
   <input type="file" id="importFile" accept="application/json" hidden />
+  <input type="file" id="documentFileInput" hidden />
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <footer class="footer">
-    <p>Agora você pode editar na própria tela. As alterações ficam salvas neste navegador via <code>localStorage</code>. Use <strong>Exportar JSON</strong> para guardar uma cópia ou atualizar o GitHub.</p>
+    <p>Agora você pode editar na própria tela. As alterações ficam salvas neste navegador. Textos ficam no <code>localStorage</code> e arquivos enviados ficam no <code>IndexedDB</code> do próprio aparelho. Use <strong>Exportar JSON</strong> para guardar uma cópia dos dados; os arquivos locais precisam ser baixados ou mantidos também em Drive/OneDrive se você quiser acesso em outros aparelhos.</p>
   </footer>
 
   <script src="app.js"></script>

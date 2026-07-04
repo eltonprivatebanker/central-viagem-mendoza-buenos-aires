@@ -935,3 +935,92 @@ body.modal-open{
     justify-content:center;
   }
 }
+
+/* ===== v3 sistema: agenda e arquivos ===== */
+.edit-hint{
+  margin:-4px 0 18px;
+  color:var(--muted);
+  border:1px dashed rgba(215,168,95,.30);
+  background:rgba(215,168,95,.06);
+  border-radius:18px;
+  padding:12px 14px;
+  line-height:1.5;
+}
+
+.day-toolbox{
+  max-width:260px;
+  justify-content:flex-end;
+}
+
+.file-empty{
+  margin-top:12px;
+  color:var(--muted);
+  border:1px dashed var(--line-strong);
+  background:rgba(255,255,255,.025);
+  border-radius:14px;
+  padding:10px 11px;
+  font-size:.86rem;
+}
+
+.file-box{
+  margin-top:12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border:1px solid rgba(215,168,95,.28);
+  background:rgba(215,168,95,.07);
+  border-radius:15px;
+  padding:10px 11px;
+}
+
+.file-box .file-icon{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+  background:rgba(255,255,255,.06);
+  margin-top:0;
+}
+
+.file-box strong{
+  font-size:.88rem;
+  line-height:1.25;
+}
+
+.file-box small{
+  display:block;
+  margin-top:3px;
+  color:var(--muted);
+  line-height:1.3;
+}
+
+.file-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:12px;
+}
+
+.document-link{
+  display:inline-flex;
+  margin-top:10px;
+  color:var(--brand-2);
+  font-weight:750;
+}
+
+body.is-editing .document{
+  border-color:rgba(215,168,95,.18);
+}
+
+@media (max-width:640px){
+  .day-toolbox,
+  .file-actions{
+    justify-content:flex-start;
+  }
+
+  .day-toolbox .mini-button,
+  .file-actions .mini-button{
+    flex:1 1 auto;
+  }
+}

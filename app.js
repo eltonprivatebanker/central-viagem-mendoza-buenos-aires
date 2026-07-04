@@ -113,9 +113,11 @@ const FALLBACK_DATA = {
   ]
 };
 
-const STORAGE_KEY = "central_viagem_data_v2";
-const EDIT_MODE_KEY = "central_viagem_edit_mode_v2";
+const STORAGE_KEY = "central_viagem_data_v3";
+const EDIT_MODE_KEY = "central_viagem_edit_mode_v3";
 const LEGACY_CHECKED_KEY = "trip_checked_tasks";
+const FILE_DB_NAME = "central_viagem_arquivos_v1";
+const FILE_STORE_NAME = "arquivos";
 
 let state = {
   data: null,
@@ -175,7 +177,12 @@ function ensureDataShape(){
   data.dias.forEach((item, index) => item.id = item.id || `day-${index + 1}-${uid()}`);
   data.reservas.forEach((item, index) => item.id = item.id || `booking-${index + 1}-${uid()}`);
   data.links.forEach((item, index) => item.id = item.id || `link-${index + 1}-${uid()}`);
-  data.documentos.forEach((item, index) => item.id = item.id || `doc-${index + 1}-${uid()}`);
+  data.documentos.forEach((item, index) => {
+    item.id = item.id || `doc-${index + 1}-${uid()}`;
+    item.url = item.url || "";
+    item.status = item.status || "pending";
+    item.arquivo = item.arquivo || null;
+  });
 
   state.data = data;
 }
@@ -325,7 +332,7 @@ function renderTimeline(){
         </div>
         <div class="day-actions">
           <span class="city-tag">${escapeHtml(day.cidade || "Roteiro")}</span>
-          ${editControls("day", day.id)}
+          ${dayEditControls(day.id)}
         </div>
       </header>
       <div class="period-grid">
@@ -378,9 +385,37 @@ function renderDocuments(){
         <span class="status ${statusClass(doc.status)}">${statusLabel(doc.status)}</span>
       </div>
       <span>${escapeHtml(doc.detalhe || "")}</span>
+      ${doc.url ? `<a class="document-link" href="${safeHref(doc.url)}" target="_blank" rel="noopener">Abrir link externo</a>` : ""}
+      ${documentAttachmentBlock(doc)}
       ${editControls("document", doc.id)}
+      ${documentFileControls(doc)}
     </article>
   `).join("") || `<p class="empty">Nenhum documento cadastrado.</p>`;
+}
+
+function documentAttachmentBlock(doc){
+  if(!doc.arquivo?.fileId) return `<div class="file-empty">Nenhum arquivo enviado ainda.</div>`;
+
+  return `
+    <div class="file-box">
+      <span class="file-icon">📎</span>
+      <div>
+        <strong>${escapeHtml(doc.arquivo.nome || "Arquivo")}</strong>
+        <small>${escapeHtml(formatBytes(doc.arquivo.tamanho || 0))}${doc.arquivo.enviadoEm ? ` · ${escapeHtml(doc.arquivo.enviadoEm)}` : ""}</small>
+      </div>
+    </div>
+  `;
+}
+
+function documentFileControls(doc){
+  const hasFile = Boolean(doc.arquivo?.fileId);
+  return `
+    <div class="file-actions">
+      ${hasFile ? `<button type="button" class="mini-button" data-action="downloadDocument" data-id="${escapeAttribute(doc.id)}">Baixar arquivo</button>` : ""}
+      <button type="button" class="mini-button edit-only-inline" data-action="uploadDocument" data-id="${escapeAttribute(doc.id)}">${hasFile ? "Trocar arquivo" : "Enviar arquivo"}</button>
+      ${hasFile ? `<button type="button" class="mini-button danger-mini edit-only-inline" data-action="removeDocumentFile" data-id="${escapeAttribute(doc.id)}">Remover arquivo</button>` : ""}
+    </div>
+  `;
 }
 
 function editControls(type, id){
@@ -389,6 +424,19 @@ function editControls(type, id){
     <div class="card-actions edit-only-inline">
       <button type="button" class="mini-button" data-action="edit" data-type="${escapeAttribute(type)}" data-id="${escapeAttribute(id)}">Editar</button>
       <button type="button" class="mini-button danger-mini" data-action="delete" data-type="${escapeAttribute(type)}" data-id="${escapeAttribute(id)}">Excluir</button>
+    </div>
+  `;
+}
+
+function dayEditControls(id){
+  if(!state.editMode) return "";
+  return `
+    <div class="card-actions edit-only-inline day-toolbox">
+      <button type="button" class="mini-button" data-action="move" data-type="day" data-direction="up" data-id="${escapeAttribute(id)}" title="Mover dia para cima">↑</button>
+      <button type="button" class="mini-button" data-action="move" data-type="day" data-direction="down" data-id="${escapeAttribute(id)}" title="Mover dia para baixo">↓</button>
+      <button type="button" class="mini-button" data-action="edit" data-type="day" data-id="${escapeAttribute(id)}">Editar agenda</button>
+      <button type="button" class="mini-button" data-action="duplicate" data-type="day" data-id="${escapeAttribute(id)}">Duplicar</button>
+      <button type="button" class="mini-button danger-mini" data-action="delete" data-type="day" data-id="${escapeAttribute(id)}">Excluir</button>
     </div>
   `;
 }
@@ -444,6 +492,7 @@ function bindEvents(){
   $("#editTripButton").addEventListener("click", () => openTripEditor());
   $("#addTaskButton").addEventListener("click", () => openItemEditor("task"));
   $("#addDayButton").addEventListener("click", () => openItemEditor("day"));
+  $("#renumberDaysButton").addEventListener("click", renumberDays);
   $("#addBookingButton").addEventListener("click", () => openItemEditor("booking"));
   $("#addLinkButton").addEventListener("click", () => openItemEditor("link"));
   $("#addDocumentButton").addEventListener("click", () => openItemEditor("document"));
@@ -451,6 +500,7 @@ function bindEvents(){
   $("#exportButton").addEventListener("click", exportData);
   $("#importButton").addEventListener("click", () => $("#importFile").click());
   $("#importFile").addEventListener("change", importDataFromFile);
+  $("#documentFileInput").addEventListener("change", handleDocumentFileSelected);
   $("#resetButton").addEventListener("click", resetLocalData);
 
   document.addEventListener("change", (event) => {
@@ -472,6 +522,11 @@ function bindEvents(){
     if(action === "closeModal") closeModal();
     if(action === "edit") openItemEditor(actionButton.dataset.type, actionButton.dataset.id);
     if(action === "delete") deleteItem(actionButton.dataset.type, actionButton.dataset.id);
+    if(action === "move") moveItem(actionButton.dataset.type, actionButton.dataset.id, actionButton.dataset.direction);
+    if(action === "duplicate") duplicateItem(actionButton.dataset.type, actionButton.dataset.id);
+    if(action === "uploadDocument") uploadDocumentFile(actionButton.dataset.id);
+    if(action === "downloadDocument") downloadDocumentFile(actionButton.dataset.id);
+    if(action === "removeDocumentFile") removeDocumentFile(actionButton.dataset.id);
   });
 
   $("#editorForm").addEventListener("submit", submitEditorForm);
@@ -522,16 +577,16 @@ function entityConfig(type){
     day: {
       label:"dia/evento",
       collection:"dias",
-      empty: () => ({id:`day-${uid()}`, dia:"", data:"", cidade:"", titulo:"", manha:"", tarde:"", noite:"", link:""}),
+      empty: () => ({id:`day-${uid()}`, dia:`Dia ${(state.data.dias || []).length + 1}`, data:"", cidade:"", titulo:"", manha:"", tarde:"", noite:"", link:""}),
       fields: item => [
-        field("dia", "Dia", "text", item.dia),
+        field("dia", "Nome do dia", "text", item.dia),
         field("data", "Data", "text", item.data),
         field("cidade", "Cidade / etapa", "text", item.cidade),
         field("titulo", "Título do dia", "text", item.titulo),
-        field("manha", "Manhã", "textarea", item.manha),
-        field("tarde", "Tarde", "textarea", item.tarde),
-        field("noite", "Noite", "textarea", item.noite),
-        field("link", "Link opcional", "text", item.link)
+        field("manha", "Agenda da manhã", "textarea", item.manha),
+        field("tarde", "Agenda da tarde", "textarea", item.tarde),
+        field("noite", "Agenda da noite", "textarea", item.noite),
+        field("link", "Link opcional do dia", "text", item.link)
       ]
     },
     booking: {
@@ -556,12 +611,13 @@ function entityConfig(type){
       ]
     },
     document: {
-      label:"documento",
+      label:"documento/arquivo",
       collection:"documentos",
-      empty: () => ({id:`doc-${uid()}`, nome:"", detalhe:"", status:"pending"}),
+      empty: () => ({id:`doc-${uid()}`, nome:"", detalhe:"", url:"", status:"pending", arquivo:null}),
       fields: item => [
         field("nome", "Nome", "text", item.nome),
         field("detalhe", "Detalhes", "textarea", item.detalhe),
+        field("url", "Link externo opcional", "text", item.url),
         field("status", "Status", "select", item.status || "pending", statusOptions)
       ]
     }
@@ -716,6 +772,7 @@ function collectItemFromForm(type, form, existingId){
       id,
       nome: clean(form.get("nome")) || "Novo documento",
       detalhe: clean(form.get("detalhe")),
+      url: clean(form.get("url")),
       status: clean(form.get("status")) || "pending"
     };
   }
@@ -723,7 +780,7 @@ function collectItemFromForm(type, form, existingId){
   return {id};
 }
 
-function deleteItem(type, id){
+async function deleteItem(type, id){
   const config = entityConfig(type);
   if(!config || !id) return;
 
@@ -732,8 +789,57 @@ function deleteItem(type, id){
 
   if(!confirm(`Excluir "${label}"?`)) return;
 
+  if(type === "document" && item?.arquivo?.fileId){
+    await deleteStoredFile(item.arquivo.fileId);
+  }
+
   state.data[config.collection] = (state.data[config.collection] || []).filter(entry => entry.id !== id);
   saveData("Item excluído.");
+}
+
+function moveItem(type, id, direction){
+  const config = entityConfig(type);
+  if(!config || !id) return;
+
+  const collection = state.data[config.collection] || [];
+  const index = collection.findIndex(item => item.id === id);
+  if(index < 0) return;
+
+  const target = direction === "up" ? index - 1 : index + 1;
+  if(target < 0 || target >= collection.length) return;
+
+  [collection[index], collection[target]] = [collection[target], collection[index]];
+  saveData(direction === "up" ? "Item movido para cima." : "Item movido para baixo.");
+}
+
+function duplicateItem(type, id){
+  const config = entityConfig(type);
+  if(!config || !id) return;
+
+  const collection = state.data[config.collection] || [];
+  const index = collection.findIndex(item => item.id === id);
+  if(index < 0) return;
+
+  const copy = structuredCloneSafe(collection[index]);
+  copy.id = `${type}-${uid()}`;
+  if(copy.dia) copy.dia = `${copy.dia} cópia`;
+  if(copy.titulo) copy.titulo = `${copy.titulo} cópia`;
+  if(copy.nome) copy.nome = `${copy.nome} cópia`;
+  if(type === "document") copy.arquivo = null;
+
+  collection.splice(index + 1, 0, copy);
+  saveData("Item duplicado.");
+}
+
+function renumberDays(){
+  if(!confirm("Renumerar os dias conforme a ordem atual dos cartões?")) return;
+
+  state.data.dias = (state.data.dias || []).map((day, index) => ({
+    ...day,
+    dia: `Dia ${String(index + 1).padStart(2, "0")}`
+  }));
+
+  saveData("Dias renumerados.");
 }
 
 function closeModal(){
@@ -778,11 +884,163 @@ function importDataFromFile(event){
 }
 
 function resetLocalData(){
-  if(!confirm("Resetar as edições salvas neste navegador e voltar para a base do GitHub?")) return;
+  if(!confirm("Resetar as edições salvas neste navegador e voltar para a base do GitHub? Isso também remove arquivos enviados localmente neste aparelho.")) return;
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(LEGACY_CHECKED_KEY);
+
+  try{
+    if(window.indexedDB) indexedDB.deleteDatabase(FILE_DB_NAME);
+  }catch(error){
+    console.warn("Não foi possível apagar o banco local de arquivos.", error);
+  }
+
   showToast("Edições locais removidas. Recarregando...");
   setTimeout(() => window.location.reload(), 500);
+}
+
+async function uploadDocumentFile(documentId){
+  const doc = findById(state.data.documentos, documentId);
+  if(!doc) return;
+
+  state.pendingDocumentUploadId = documentId;
+  const input = $("#documentFileInput");
+  input.value = "";
+  input.click();
+}
+
+async function handleDocumentFileSelected(event){
+  const file = event.target.files?.[0];
+  const documentId = state.pendingDocumentUploadId;
+  state.pendingDocumentUploadId = null;
+  event.target.value = "";
+
+  if(!file || !documentId) return;
+
+  const doc = findById(state.data.documentos, documentId);
+  if(!doc) return;
+
+  if(file.size > 25 * 1024 * 1024){
+    alert("Arquivo muito grande para guardar no navegador. Tente usar até 25 MB ou salve em uma pasta do Google Drive e cole o link.");
+    return;
+  }
+
+  if(doc.arquivo?.fileId){
+    await deleteStoredFile(doc.arquivo.fileId);
+  }
+
+  const fileId = `file-${uid()}`;
+  await saveStoredFile(fileId, file);
+
+  doc.arquivo = {
+    fileId,
+    nome: file.name,
+    tipo: file.type || "application/octet-stream",
+    tamanho: file.size,
+    enviadoEm: new Date().toLocaleDateString("pt-BR")
+  };
+  doc.status = "done";
+
+  saveData("Arquivo enviado e salvo neste navegador.");
+}
+
+async function downloadDocumentFile(documentId){
+  const doc = findById(state.data.documentos, documentId);
+  if(!doc?.arquivo?.fileId) return;
+
+  const record = await getStoredFile(doc.arquivo.fileId);
+  if(!record?.blob){
+    alert("Não encontrei este arquivo neste navegador. Se ele foi importado via JSON, o JSON guarda os dados, mas não carrega o arquivo em si.");
+    return;
+  }
+
+  const url = URL.createObjectURL(record.blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = doc.arquivo.nome || record.name || "documento";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function removeDocumentFile(documentId){
+  const doc = findById(state.data.documentos, documentId);
+  if(!doc?.arquivo?.fileId) return;
+
+  if(!confirm(`Remover o arquivo de "${doc.nome}" deste navegador?`)) return;
+
+  await deleteStoredFile(doc.arquivo.fileId);
+  doc.arquivo = null;
+  doc.status = "pending";
+  saveData("Arquivo removido.");
+}
+
+function openFilesDb(){
+  return new Promise((resolve, reject) => {
+    if(!window.indexedDB){
+      reject(new Error("Este navegador não suporta IndexedDB."));
+      return;
+    }
+
+    const request = indexedDB.open(FILE_DB_NAME, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if(!db.objectStoreNames.contains(FILE_STORE_NAME)){
+        db.createObjectStore(FILE_STORE_NAME, {keyPath:"id"});
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveStoredFile(id, file){
+  const db = await openFilesDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE_NAME, "readwrite");
+    tx.objectStore(FILE_STORE_NAME).put({
+      id,
+      name:file.name,
+      type:file.type,
+      size:file.size,
+      savedAt:new Date().toISOString(),
+      blob:file
+    });
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+async function getStoredFile(id){
+  const db = await openFilesDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE_NAME, "readonly");
+    const request = tx.objectStore(FILE_STORE_NAME).get(id);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => db.close();
+  });
+}
+
+async function deleteStoredFile(id){
+  if(!id || !window.indexedDB) return;
+
+  const db = await openFilesDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE_NAME, "readwrite");
+    tx.objectStore(FILE_STORE_NAME).delete(id);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+function formatBytes(bytes){
+  const size = Number(bytes || 0);
+  if(size < 1024) return `${size} B`;
+  if(size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function findById(collection, id){

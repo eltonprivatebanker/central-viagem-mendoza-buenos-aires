@@ -1,6 +1,6 @@
-/* Central de Viagem v5 — sistema visual editável
+/* Central de Viagem v5.2 — calendário compartilhado + Google Maps
    GitHub Pages + localStorage agora. Preparado para evoluir para Google Sheets/Drive via Apps Script. */
-const STORAGE_KEY = "centralViagemV5Completo";
+const STORAGE_KEY = "centralViagemV5Completo"; // mantido para migrar dados locais da v5/v5.1
 const uid = () => `${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36).slice(-5)}`;
 
 const defaultData = {
@@ -9,13 +9,17 @@ const defaultData = {
     subtitle: "Sistema visual para roteiro, lugares, mapa, reservas, documentos e orçamento.",
     period: "27/07 a 10/08",
     base: "Puerto Iguazú / Foz do Iguaçu",
-    people: "Elton, família e Oliver"
+    people: "Elton, família e Oliver",
+    year: "2026"
   },
   settings: {
     syncMode: "local",
     appsScriptUrl: "",
     driveFolderUrl: "",
-    editorPasswordHint: ""
+    editorPasswordHint: "",
+    googleCalendarName: "Viagem Mendoza & Buenos Aires 2026",
+    googleCalendarUrl: "",
+    calendarTimezone: "America/Sao_Paulo"
   },
   days: [
     { id: "d1", number: 1, label: "Seg 27/07", date: "27/07", title: "Saída da viagem", city: "Deslocamento", morning: "Conferir documentos, malas, dinheiro/cartões e deslocamento até o ponto de saída.", afternoon: "Viagem/deslocamento. Guardar comprovantes e localizadores.", night: "Chegada e check-in, se aplicável. Jantar leve.", lodging: "A definir", transport: "Deslocamento inicial", notes: "" },
@@ -24,11 +28,11 @@ const defaultData = {
     { id: "d4", number: 4, label: "Qui 30/07", date: "30/07", title: "Deslocamento para Mendoza", city: "Mendoza", morning: "Checkout e deslocamento.", afternoon: "Chegada em Mendoza e retirada de carro, se aplicável.", night: "Check-in e jantar tranquilo.", lodging: "Hotel Mendoza — pendente", transport: "Voo/ônibus/carro a definir", notes: "Validar melhor custo/tempo." }
   ],
   places: [
-    { id: "p1", name: "Puerto Madero", city: "Buenos Aires", category: "Passeio", status: "planned", priority: "Alta", dayId: "d2", period: "afternoon", lat: -34.6118, lng: -58.3638, url: "https://www.google.com/maps/search/Puerto+Madero", notes: "Bom para caminhada leve, fotos e restaurante." },
-    { id: "p2", name: "Recoleta", city: "Buenos Aires", category: "Bairro", status: "planned", priority: "Alta", dayId: "d3", period: "morning", lat: -34.5875, lng: -58.3974, url: "https://www.google.com/maps/search/Recoleta+Buenos+Aires", notes: "Região clássica, fácil de combinar com cafés e parques." },
-    { id: "p3", name: "Palermo", city: "Buenos Aires", category: "Bairro/parque", status: "wishlist", priority: "Alta", dayId: "d3", period: "afternoon", lat: -34.5795, lng: -58.4309, url: "https://www.google.com/maps/search/Palermo+Buenos+Aires", notes: "Parques, cafés e pausa para criança." },
-    { id: "p4", name: "Parque General San Martín", city: "Mendoza", category: "Parque", status: "wishlist", priority: "Média", dayId: "", period: "free", lat: -32.8892, lng: -68.8745, url: "https://www.google.com/maps/search/Parque+General+San+Martin+Mendoza", notes: "Boa opção visual e leve para família." },
-    { id: "p5", name: "Parque Provincial Aconcágua", city: "Mendoza", category: "Montanha", status: "wishlist", priority: "Alta", dayId: "", period: "free", lat: -32.8244, lng: -69.9425, url: "https://www.google.com/maps/search/Parque+Provincial+Aconcagua", notes: "Validar clima, estrada, altitude e se vale para ir com criança." }
+    { id: "p1", name: "Puerto Madero", city: "Buenos Aires", category: "Passeio", status: "planned", priority: "Alta", dayId: "d2", period: "afternoon", lat: -34.6118, lng: -58.3638, url: "https://www.google.com/maps/search/Puerto+Madero", location: "Puerto Madero, Buenos Aires", startTime: "14:00", endTime: "17:00", notes: "Bom para caminhada leve, fotos e restaurante." },
+    { id: "p2", name: "Recoleta", city: "Buenos Aires", category: "Bairro", status: "planned", priority: "Alta", dayId: "d3", period: "morning", lat: -34.5875, lng: -58.3974, url: "https://www.google.com/maps/search/Recoleta+Buenos+Aires", location: "Recoleta, Buenos Aires", startTime: "09:00", endTime: "12:00", notes: "Região clássica, fácil de combinar com cafés e parques." },
+    { id: "p3", name: "Palermo", city: "Buenos Aires", category: "Bairro/parque", status: "wishlist", priority: "Alta", dayId: "d3", period: "afternoon", lat: -34.5795, lng: -58.4309, url: "https://www.google.com/maps/search/Palermo+Buenos+Aires", location: "Palermo, Buenos Aires", startTime: "14:00", endTime: "17:00", notes: "Parques, cafés e pausa para criança." },
+    { id: "p4", name: "Parque General San Martín", city: "Mendoza", category: "Parque", status: "wishlist", priority: "Média", dayId: "", period: "free", lat: -32.8892, lng: -68.8745, url: "https://www.google.com/maps/search/Parque+General+San+Martin+Mendoza", location: "Parque General San Martín, Mendoza", startTime: "09:00", endTime: "12:00", notes: "Boa opção visual e leve para família." },
+    { id: "p5", name: "Parque Provincial Aconcágua", city: "Mendoza", category: "Montanha", status: "wishlist", priority: "Alta", dayId: "", period: "free", lat: -32.8244, lng: -69.9425, url: "https://www.google.com/maps/search/Parque+Provincial+Aconcagua", location: "Parque Provincial Aconcágua, Mendoza", startTime: "09:00", endTime: "15:00", notes: "Validar clima, estrada, altitude e se vale para ir com criança." }
   ],
   tasks: [
     { id: "t1", title: "Definir hotel em Buenos Aires", description: "Conferir bairro, café da manhã, cancelamento e distância dos passeios.", critical: true, done: false },
@@ -38,8 +42,8 @@ const defaultData = {
     { id: "t5", title: "Organizar documentos em PDF", description: "Documentos pessoais, reservas, seguro viagem e comprovantes.", critical: true, done: false }
   ],
   reservations: [
-    { id: "r1", type: "Hospedagem", title: "Hotel em Buenos Aires", status: "Pendente", city: "Buenos Aires", date: "27/07", time: "", endDate: "30/07", amount: 0, paid: 0, dayId: "d2", link: "", notes: "Escolher bairro e política de cancelamento." },
-    { id: "r2", type: "Carro", title: "Carro em Mendoza", status: "Pendente", city: "Mendoza", date: "30/07", time: "", endDate: "", amount: 0, paid: 0, dayId: "d4", link: "", notes: "Conferir seguro e cadeirinha." }
+    { id: "r1", type: "Hospedagem", title: "Hotel em Buenos Aires", status: "Pendente", city: "Buenos Aires", date: "27/07", time: "", endDate: "30/07", amount: 0, paid: 0, dayId: "d2", link: "", location: "Buenos Aires", endTime: "", notes: "Escolher bairro e política de cancelamento." },
+    { id: "r2", type: "Carro", title: "Carro em Mendoza", status: "Pendente", city: "Mendoza", date: "30/07", time: "", endDate: "", amount: 0, paid: 0, dayId: "d4", link: "", location: "Mendoza", endTime: "", notes: "Conferir seguro e cadeirinha." }
   ],
   documents: [
     { id: "doc1", title: "Documentos pessoais", category: "Documentos pessoais", status: "Pendente", dayId: "", link: "", notes: "RG/passaporte de todos.", file: null },
@@ -848,5 +852,533 @@ function resetLocalData(){
   selectedPlaceId = null;
   saveAndRender("Dados resetados");
 }
+
+
+/* =========================
+   v5.2 — Calendário compartilhado + Google Maps
+   Mantém localStorage, mas adiciona botões para Google Agenda e melhor integração com links do Google Maps.
+========================= */
+
+function normalizeData(source){
+  const merged = structuredCloneSafe(defaultData);
+  Object.assign(merged.trip, source.trip || {});
+  Object.assign(merged.settings, source.settings || {});
+  ["days","places","tasks","reservations","documents","expenses"].forEach(key => {
+    if(Array.isArray(source[key])) merged[key] = source[key];
+  });
+  merged.trip.year = merged.trip.year || String(new Date().getFullYear());
+  merged.settings.googleCalendarName = merged.settings.googleCalendarName || `Viagem ${merged.trip.title || ""}`.trim();
+  merged.settings.googleCalendarUrl = merged.settings.googleCalendarUrl || "";
+  merged.settings.calendarTimezone = merged.settings.calendarTimezone || "America/Sao_Paulo";
+  merged.places = merged.places.map(p => ({ location: p.city || "", startTime: defaultPeriodStart(p.period), endTime: defaultPeriodEnd(p.period), ...p }));
+  merged.reservations = merged.reservations.map(r => ({ location: r.city || "", endTime: "", ...r }));
+  merged.documents = merged.documents.map(d => ({ file:null, ...d }));
+  return merged;
+}
+
+function ensureV52Defaults(){
+  data = normalizeData(data);
+  saveData();
+}
+
+function defaultPeriodStart(period){
+  return ({ morning:"09:00", afternoon:"14:00", night:"19:00" })[period] || "09:00";
+}
+function defaultPeriodEnd(period){
+  return ({ morning:"12:00", afternoon:"17:00", night:"21:00" })[period] || "10:00";
+}
+function pad2(n){ return String(n).padStart(2,"0"); }
+function addOneDay(ymd){
+  const d = new Date(`${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6,8)}T12:00:00`);
+  d.setDate(d.getDate()+1);
+  return `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}`;
+}
+function parseDateParts(value){
+  const raw = String(value || "").trim();
+  if(!raw) return null;
+  let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) return { y:Number(m[1]), m:Number(m[2]), d:Number(m[3]) };
+  m = raw.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if(m){
+    let year = m[3] ? Number(m[3]) : Number(data.trip.year || new Date().getFullYear());
+    if(year < 100) year += 2000;
+    return { y:year, m:Number(m[2]), d:Number(m[1]) };
+  }
+  return null;
+}
+function calendarDateStamp(value){
+  const p = parseDateParts(value);
+  if(!p) return "";
+  return `${p.y}${pad2(p.m)}${pad2(p.d)}`;
+}
+function cleanTime(value, fallback=""){
+  const raw = String(value || "").trim();
+  const m = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if(m) return `${pad2(m[1])}:${m[2]}`;
+  return fallback;
+}
+function calendarDatesParam(dateValue, startTime="", endTime=""){
+  const d = calendarDateStamp(dateValue);
+  if(!d) return "";
+  const start = cleanTime(startTime);
+  const end = cleanTime(endTime);
+  if(start){
+    const [sh, sm] = start.split(":");
+    const [eh, em] = cleanTime(endTime, "").split(":");
+    const endHour = eh || String(Math.min(Number(sh)+1, 23));
+    const endMin = em || sm || "00";
+    return `${d}T${pad2(sh)}${sm}00/${d}T${pad2(endHour)}${endMin}00`;
+  }
+  return `${d}/${addOneDay(d)}`;
+}
+function buildGoogleCalendarUrl(event){
+  const dates = calendarDatesParam(event.date, event.startTime, event.endTime);
+  if(!dates){ showToast("Preencha uma data válida antes de enviar para a agenda"); return ""; }
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: event.title || data.trip.title || "Evento da viagem",
+    dates,
+    details: event.details || "",
+    location: event.location || "",
+    ctz: data.settings.calendarTimezone || "America/Sao_Paulo"
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+function openGoogleCalendarForEvent(event){
+  const url = buildGoogleCalendarUrl(event);
+  if(url) window.open(url, "_blank", "noopener");
+}
+function placeCalendarEvent(place){
+  const day = data.days.find(d => d.id === place.dayId);
+  const start = place.startTime || defaultPeriodStart(place.period);
+  const end = place.endTime || defaultPeriodEnd(place.period);
+  return {
+    title: `${place.name} — ${data.trip.title}`,
+    date: day?.date || "",
+    startTime: start,
+    endTime: end,
+    location: place.location || place.url || `${place.name}, ${place.city || ""}`,
+    details: [
+      `Lugar cadastrado na Central de Viagem.`,
+      `Cidade: ${place.city || "—"}`,
+      `Categoria: ${place.category || "—"}`,
+      `Dia: ${dayLabel(place.dayId)}`,
+      place.url ? `Google Maps: ${place.url}` : "",
+      place.notes ? `Observações: ${place.notes}` : ""
+    ].filter(Boolean).join("\n")
+  };
+}
+function reservationCalendarEvent(res){
+  return {
+    title: `${res.type || "Reserva"}: ${res.title}`,
+    date: res.date || data.days.find(d => d.id === res.dayId)?.date || "",
+    startTime: res.time || "",
+    endTime: res.endTime || "",
+    location: res.location || res.city || res.link || "",
+    details: [
+      `Reserva/compromisso cadastrado na Central de Viagem.`,
+      `Status: ${res.status || "—"}`,
+      `Cidade: ${res.city || "—"}`,
+      res.link ? `Link: ${res.link}` : "",
+      res.notes ? `Observações: ${res.notes}` : ""
+    ].filter(Boolean).join("\n")
+  };
+}
+function dayCalendarEvent(day){
+  const places = data.places.filter(p => p.dayId === day.id);
+  const reservations = data.reservations.filter(r => r.dayId === day.id || r.date === day.date);
+  return {
+    title: `Dia ${String(day.number).padStart(2,"0")} — ${day.title}`,
+    date: day.date,
+    startTime: "",
+    endTime: "",
+    location: day.city || data.trip.base || "",
+    details: [
+      `Agenda do dia na viagem ${data.trip.title}.`,
+      day.morning ? `Manhã: ${day.morning}` : "",
+      day.afternoon ? `Tarde: ${day.afternoon}` : "",
+      day.night ? `Noite: ${day.night}` : "",
+      day.lodging ? `Hospedagem: ${day.lodging}` : "",
+      day.transport ? `Deslocamento: ${day.transport}` : "",
+      places.length ? `Lugares: ${places.map(p => p.name).join(", ")}` : "",
+      reservations.length ? `Reservas: ${reservations.map(r => r.title).join(", ")}` : "",
+      day.notes ? `Observações: ${day.notes}` : ""
+    ].filter(Boolean).join("\n")
+  };
+}
+function downloadIcsForEvent(event, filename="evento-viagem.ics"){
+  const dates = calendarDatesParam(event.date, event.startTime, event.endTime);
+  if(!dates){ showToast("Preencha uma data válida antes de gerar o ICS"); return; }
+  const [start, end] = dates.split("/");
+  const isAllDay = !String(start).includes("T");
+  const dtStart = isAllDay ? `DTSTART;VALUE=DATE:${start}` : `DTSTART;TZID=${data.settings.calendarTimezone || "America/Sao_Paulo"}:${start}`;
+  const dtEnd = isAllDay ? `DTEND;VALUE=DATE:${end}` : `DTEND;TZID=${data.settings.calendarTimezone || "America/Sao_Paulo"}:${end}`;
+  const esc = v => String(v || "").replace(/\\/g,"\\\\").replace(/,/g,"\\,").replace(/;/g,"\\;").replace(/\n/g,"\\n");
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Central de Viagem//PT-BR",
+    "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:${uid()}@central-viagem`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").split(".")[0]}Z`,
+    dtStart,
+    dtEnd,
+    `SUMMARY:${esc(event.title)}`,
+    `DESCRIPTION:${esc(event.details)}`,
+    event.location ? `LOCATION:${esc(event.location)}` : "",
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ].filter(Boolean).join("\r\n");
+  const blob = new Blob([ics], { type:"text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("Arquivo .ics gerado");
+}
+function extractLatLngFromMapsUrl(url){
+  const raw = String(url || "");
+  const patterns = [
+    /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+    /[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+    /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/
+  ];
+  for(const p of patterns){
+    const m = raw.match(p);
+    if(m) return { lat:Number(m[1]), lng:Number(m[2]) };
+  }
+  return null;
+}
+function openMapsLink(url){
+  if(!url){ showToast("Cadastre o link do Google Maps"); return; }
+  window.open(url, "_blank", "noopener");
+}
+function copyText(text){
+  if(!text){ showToast("Nada para copiar"); return; }
+  navigator.clipboard?.writeText(text).then(()=>showToast("Link copiado"),()=>showToast("Não foi possível copiar"));
+}
+function openCalendarSetupModal(){
+  openModal("Como criar a agenda compartilhada", `<div class="settings-box full-helper">
+    <p class="muted">Crie uma agenda exclusiva para a viagem e compartilhe com sua esposa. Depois, use os botões <strong>Google Agenda</strong> nos dias, lugares e reservas.</p>
+    <div class="code-block">1. Acesse calendar.google.com no computador.\n2. Em Outras agendas, clique em +.\n3. Escolha Criar nova agenda.\n4. Nome: ${escapeHtml(data.settings.googleCalendarName || "Viagem Mendoza & Buenos Aires 2026")}\n5. Compartilhe com o e-mail da sua esposa.\n6. Permissão sugerida: Fazer alterações nos eventos.</div>
+    <p class="muted">A integração desta versão abre o Google Agenda com os dados preenchidos. Você escolhe a agenda da viagem no próprio Google Agenda antes de salvar o evento.</p>
+  </div>`, () => closeModal(), "Entendi");
+}
+
+function renderItinerary(){
+  const sorted = data.days.slice().sort((a,b) => Number(a.number) - Number(b.number));
+  byId("itineraryList").innerHTML = sorted.map((day, idx) => {
+    const periodHtml = (key, title, note) => {
+      const places = data.places.filter(p => p.dayId === day.id && p.period === key);
+      return `<div class="period">
+        <div class="period-title">${title}</div>
+        <div class="period-note">${escapeHtml(note || "")}</div>
+        ${places.map(place => `<div class="mini-place"><span>📍</span><button data-select-place="${place.id}">${escapeHtml(place.name)}<small>${escapeHtml(place.category)} · ${statusLabel(place.status)} · ${place.startTime || defaultPeriodStart(place.period)}</small></button></div>`).join("")}
+        <button class="ghost tiny" data-add-place-to-day="${day.id}" data-period="${key}">+ lugar neste período</button>
+      </div>`;
+    };
+    const dayReservations = data.reservations.filter(r => r.dayId === day.id || (r.date && r.date === day.date));
+    return `<article class="itinerary-day" data-day-card="${day.id}">
+      <div class="day-head">
+        <div class="day-title">
+          <strong>Dia ${String(day.number).padStart(2,"0")} · ${escapeHtml(day.title)}</strong>
+          <small>${escapeHtml(day.label || "")} · ${escapeHtml(day.date || "")} · ${escapeHtml(day.city || "")}</small>
+          ${(day.lodging || day.transport) ? `<small>🏨 ${escapeHtml(day.lodging || "—")} · 🚗 ${escapeHtml(day.transport || "—")}</small>` : ""}
+        </div>
+        <div class="card-actions">
+          <span class="tag blue">${escapeHtml(day.city || "Etapa")}</span>
+          <button class="ghost tiny" data-day-calendar="${day.id}">Google Agenda</button>
+          <button class="ghost tiny" data-day-ics="${day.id}">.ics</button>
+          <button class="ghost tiny" data-move-day="${day.id}" data-dir="up" ${idx===0?"disabled":""}>↑</button>
+          <button class="ghost tiny" data-move-day="${day.id}" data-dir="down" ${idx===sorted.length-1?"disabled":""}>↓</button>
+          <button class="ghost tiny" data-duplicate-day="${day.id}">Duplicar</button>
+          <button class="ghost tiny" data-edit-day="${day.id}">Editar agenda</button>
+          <button class="ghost tiny danger" data-delete-day="${day.id}">Excluir</button>
+        </div>
+      </div>
+      <div class="day-periods">
+        ${periodHtml("morning", "Manhã", day.morning)}
+        ${periodHtml("afternoon", "Tarde", day.afternoon)}
+        ${periodHtml("night", "Noite", day.night)}
+      </div>
+      ${(dayReservations.length || day.notes) ? `<div class="period" style="border-right:0;border-top:1px solid var(--border);min-height:auto">
+        ${day.notes ? `<p class="muted"><strong>Observações:</strong> ${escapeHtml(day.notes)}</p>` : ""}
+        ${dayReservations.map(r => `<div class="mini-place"><span>🎫</span><button data-edit-reservation="${r.id}">${escapeHtml(r.title)}<small>${escapeHtml(r.type)} · ${escapeHtml(r.status)} · ${formatCurrency(r.amount)}</small></button></div>`).join("")}
+      </div>` : ""}
+    </article>`;
+  }).join("") || `<div class="empty-state">Nenhum dia cadastrado. Clique em + Novo dia.</div>`;
+  document.querySelectorAll("[data-edit-day]").forEach(el => el.onclick = () => openDayModal(data.days.find(d => d.id === el.dataset.editDay)));
+  document.querySelectorAll("[data-delete-day]").forEach(el => el.onclick = () => deleteDay(el.dataset.deleteDay));
+  document.querySelectorAll("[data-duplicate-day]").forEach(el => el.onclick = () => duplicateDay(el.dataset.duplicateDay));
+  document.querySelectorAll("[data-move-day]").forEach(el => el.onclick = () => moveDay(el.dataset.moveDay, el.dataset.dir));
+  document.querySelectorAll("[data-add-place-to-day]").forEach(el => el.onclick = () => openPlaceModal(null, { dayId: el.dataset.addPlaceToDay, period: el.dataset.period }));
+  document.querySelectorAll("[data-select-place]").forEach(el => el.onclick = () => selectPlace(el.dataset.selectPlace));
+  document.querySelectorAll("[data-edit-reservation]").forEach(el => el.onclick = () => openReservationModal(data.reservations.find(r => r.id === el.dataset.editReservation)));
+  document.querySelectorAll("[data-day-calendar]").forEach(el => el.onclick = () => openGoogleCalendarForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayCalendar))));
+  document.querySelectorAll("[data-day-ics]").forEach(el => el.onclick = () => downloadIcsForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayIcs)), `dia-${el.dataset.dayIcs}.ics`));
+}
+
+function renderPlaces(){
+  const places = getFilteredPlaces();
+  byId("placesList").innerHTML = places.map(place => `
+    <article class="card ${place.id === selectedPlaceId ? "selected-card" : ""}">
+      <h3>${escapeHtml(place.name)}</h3>
+      <div class="card-meta">
+        <span class="tag blue">${escapeHtml(place.city || "Cidade")}</span>
+        <span class="tag pending">${escapeHtml(place.category || "Categoria")}</span>
+        <span class="tag ${place.status === "done" ? "ok" : place.status === "discarded" ? "critical" : "pending"}">${statusLabel(place.status)}</span>
+      </div>
+      <p>${escapeHtml(place.notes || "Sem observações.")}</p>
+      <p class="muted"><strong>Agenda:</strong> ${dayLabel(place.dayId)} · ${periodLabel(place.period)} · ${escapeHtml(place.startTime || defaultPeriodStart(place.period))}${place.endTime ? `–${escapeHtml(place.endTime)}` : ""}</p>
+      <p class="muted"><strong>Local:</strong> ${escapeHtml(place.location || place.url || place.city || "—")}</p>
+      <div class="card-actions">
+        <button class="ghost tiny" data-card-place="${place.id}">Ver no mapa</button>
+        <button class="ghost tiny" data-place-calendar="${place.id}">Google Agenda</button>
+        <button class="ghost tiny" data-place-ics="${place.id}">.ics</button>
+        <button class="ghost tiny" data-edit-place="${place.id}">Editar</button>
+        ${place.url ? `<button class="ghost tiny" data-open-maps="${place.id}">Google Maps</button><button class="ghost tiny" data-copy-maps="${place.id}">Copiar Maps</button>` : ""}
+        <button class="ghost tiny danger" data-delete-place="${place.id}">Excluir</button>
+      </div>
+    </article>`).join("") || `<div class="empty-state">Nenhum lugar encontrado. Clique em + Novo lugar.</div>`;
+  document.querySelectorAll("[data-card-place]").forEach(el => el.onclick = () => selectPlace(el.dataset.cardPlace));
+  document.querySelectorAll("[data-edit-place]").forEach(el => el.onclick = () => openPlaceModal(data.places.find(p => p.id === el.dataset.editPlace)));
+  document.querySelectorAll("[data-delete-place]").forEach(el => el.onclick = () => deleteItem("places", el.dataset.deletePlace, "Excluir este lugar?"));
+  document.querySelectorAll("[data-place-calendar]").forEach(el => el.onclick = () => openGoogleCalendarForEvent(placeCalendarEvent(data.places.find(p => p.id === el.dataset.placeCalendar))));
+  document.querySelectorAll("[data-place-ics]").forEach(el => el.onclick = () => downloadIcsForEvent(placeCalendarEvent(data.places.find(p => p.id === el.dataset.placeIcs)), `lugar-${el.dataset.placeIcs}.ics`));
+  document.querySelectorAll("[data-open-maps]").forEach(el => el.onclick = () => openMapsLink(data.places.find(p => p.id === el.dataset.openMaps)?.url));
+  document.querySelectorAll("[data-copy-maps]").forEach(el => el.onclick = () => copyText(data.places.find(p => p.id === el.dataset.copyMaps)?.url));
+  renderMapMarkers();
+}
+
+function renderReservations(){
+  byId("reservationsList").innerHTML = data.reservations.map(res => `
+    <article class="card">
+      <h3>${escapeHtml(res.title)}</h3>
+      <div class="card-meta">
+        <span class="tag blue">${escapeHtml(res.type || "Reserva")}</span>
+        <span class="tag ${res.status === "Pago" || res.status === "Reservado" ? "ok" : "pending"}">${escapeHtml(res.status || "Pendente")}</span>
+        <span class="tag pending">${formatCurrency(res.amount)}</span>
+      </div>
+      <p>${escapeHtml(res.notes || "Sem observações.")}</p>
+      <p class="muted"><strong>Data:</strong> ${escapeHtml(res.date || "—")} ${res.time ? `· ${escapeHtml(res.time)}` : ""}${res.endTime ? `–${escapeHtml(res.endTime)}` : ""} ${res.endDate ? `até ${escapeHtml(res.endDate)}` : ""}<br><strong>Dia:</strong> ${dayLabel(res.dayId)}<br><strong>Local:</strong> ${escapeHtml(res.location || res.city || "—")}</p>
+      <div class="card-actions">
+        <button class="ghost tiny" data-res-calendar="${res.id}">Google Agenda</button>
+        <button class="ghost tiny" data-res-ics="${res.id}">.ics</button>
+        <button class="ghost tiny" data-edit-res="${res.id}">Editar</button>
+        ${res.link ? `<a class="ghost tiny" href="${escapeAttr(res.link)}" target="_blank" rel="noopener">Abrir link</a>` : ""}
+        <button class="ghost tiny danger" data-delete-res="${res.id}">Excluir</button>
+      </div>
+    </article>`).join("") || `<div class="empty-state">Nenhuma reserva cadastrada.</div>`;
+  document.querySelectorAll("[data-edit-res]").forEach(el => el.onclick = () => openReservationModal(data.reservations.find(r => r.id === el.dataset.editRes)));
+  document.querySelectorAll("[data-delete-res]").forEach(el => el.onclick = () => deleteItem("reservations", el.dataset.deleteRes, "Excluir reserva?"));
+  document.querySelectorAll("[data-res-calendar]").forEach(el => el.onclick = () => openGoogleCalendarForEvent(reservationCalendarEvent(data.reservations.find(r => r.id === el.dataset.resCalendar))));
+  document.querySelectorAll("[data-res-ics]").forEach(el => el.onclick = () => downloadIcsForEvent(reservationCalendarEvent(data.reservations.find(r => r.id === el.dataset.resIcs)), `reserva-${el.dataset.resIcs}.ics`));
+}
+
+function renderSelectedPlaceBox(){
+  const box = byId("selectedPlaceBox");
+  const place = data.places.find(p => p.id === selectedPlaceId);
+  if(!place){ box.innerHTML = `<p class="muted">Selecione um lugar para ver detalhes aqui.</p>`; return; }
+  box.innerHTML = `<article class="card">
+    <h3>${escapeHtml(place.name)}</h3>
+    <div class="card-meta"><span class="tag blue">${escapeHtml(place.city)}</span><span class="tag pending">${statusLabel(place.status)}</span></div>
+    <p>${escapeHtml(place.notes || "")}</p>
+    <p class="muted">${dayLabel(place.dayId)} · ${periodLabel(place.period)} · ${escapeHtml(place.startTime || defaultPeriodStart(place.period))}</p>
+    <div class="card-actions">
+      <button class="ghost tiny" data-edit-selected-place="${place.id}">Editar</button>
+      <button class="ghost tiny" data-selected-calendar="${place.id}">Google Agenda</button>
+      ${place.url ? `<button class="ghost tiny" data-selected-maps="${place.id}">Google Maps</button>` : ""}
+    </div>
+  </article>`;
+  document.querySelector("[data-edit-selected-place]")?.addEventListener("click", () => openPlaceModal(place));
+  document.querySelector("[data-selected-calendar]")?.addEventListener("click", () => openGoogleCalendarForEvent(placeCalendarEvent(place)));
+  document.querySelector("[data-selected-maps]")?.addEventListener("click", () => openMapsLink(place.url));
+}
+
+function openTripModal(){
+  openModal("Editar dados da viagem", `<div class="form-grid">
+    <div class="full">${input("title", "Título", data.trip.title)}</div>
+    <div class="full">${textarea("subtitle", "Descrição", data.trip.subtitle)}</div>
+    ${input("period", "Período", data.trip.period)}
+    ${input("year", "Ano da viagem", data.trip.year || new Date().getFullYear(), "number", 'min="2024" max="2100"')}
+    ${input("base", "Base inicial", data.trip.base)}
+    <div class="full">${input("people", "Pessoas", data.trip.people)}</div>
+  </div>`, fd => {
+    ["title","subtitle","period","base","people"].forEach(k => data.trip[k] = fd.get(k).toString().trim());
+    data.trip.year = fd.get("year").toString().trim() || String(new Date().getFullYear());
+    closeModal(); saveAndRender("Viagem atualizada");
+  });
+}
+
+function openPlaceModal(place=null, preset={}){
+  const p = place || { id: uid(), name:"", city:"", category:"Passeio", status:"wishlist", priority:"Média", dayId:preset.dayId || "", period:preset.period || "free", lat:preset.lat || "", lng:preset.lng || "", url:"", location:"", startTime: defaultPeriodStart(preset.period), endTime: defaultPeriodEnd(preset.period), notes:"" };
+  openModal(place ? "Editar lugar" : "Adicionar lugar", `<div class="form-grid">
+    <div class="full">${input("name", "Nome do lugar", p.name, "text", "required")}</div>
+    ${input("city", "Cidade", p.city)}
+    ${input("category", "Categoria", p.category, "text", 'placeholder="Restaurante, parque, vinícola..."')}
+    ${selectInput("status", "Status", p.status, [{value:"wishlist",label:"Quero visitar"},{value:"planned",label:"No roteiro"},{value:"booked",label:"Reservado"},{value:"done",label:"Concluído"},{value:"discarded",label:"Descartado"}])}
+    ${selectInput("priority", "Prioridade", p.priority, ["Alta","Média","Baixa"])}
+    ${selectInput("dayId", "Vincular ao dia", p.dayId, dayOptions(true))}
+    ${selectInput("period", "Período", p.period, [{value:"free",label:"Sem período"},{value:"morning",label:"Manhã"},{value:"afternoon",label:"Tarde"},{value:"night",label:"Noite"}])}
+    ${input("startTime", "Início para agenda", p.startTime || defaultPeriodStart(p.period), "time")}
+    ${input("endTime", "Fim para agenda", p.endTime || defaultPeriodEnd(p.period), "time")}
+    <div class="full">${input("location", "Localização para Google Agenda", p.location || p.city || p.name)}</div>
+    ${input("lat", "Latitude", p.lat, "number", 'step="any" placeholder="-32.8895"')}
+    ${input("lng", "Longitude", p.lng, "number", 'step="any" placeholder="-68.8458"')}
+    <div class="full">${input("url", "Link Google Maps", p.url, "url", 'placeholder="https://maps.app.goo.gl/... ou URL completa do Maps"')}</div>
+    <div class="full"><button type="button" class="secondary" id="btnExtractCoords">Tentar preencher coordenadas pelo link</button></div>
+    <div class="full"><p class="muted">Link curto maps.app.goo.gl pode ser salvo e aberto normalmente, mas não revela latitude/longitude para desenhar o pino. Para o pino aparecer no mapa, preencha latitude/longitude ou cole uma URL completa do Google Maps que contenha @lat,lng.</p></div>
+    <div class="full">${textarea("notes", "Observações", p.notes)}</div>
+  </div>`, fd => {
+    const dayId = fd.get("dayId").toString();
+    const status = fd.get("status").toString();
+    const payload = {
+      id: p.id,
+      name: fd.get("name").toString().trim(),
+      city: fd.get("city").toString().trim(),
+      category: fd.get("category").toString().trim(),
+      status: dayId && status === "wishlist" ? "planned" : status,
+      priority: fd.get("priority").toString(),
+      dayId,
+      period: fd.get("period").toString(),
+      startTime: fd.get("startTime").toString(),
+      endTime: fd.get("endTime").toString(),
+      location: fd.get("location").toString().trim(),
+      lat: fd.get("lat") === "" ? "" : Number(fd.get("lat")),
+      lng: fd.get("lng") === "" ? "" : Number(fd.get("lng")),
+      url: fd.get("url").toString().trim(),
+      notes: fd.get("notes").toString().trim()
+    };
+    if(place) Object.assign(place, payload); else data.places.push(payload);
+    selectedPlaceId = payload.id;
+    closeModal(); saveAndRender("Lugar salvo");
+  });
+  setTimeout(() => {
+    const btn = byId("btnExtractCoords");
+    if(!btn) return;
+    btn.onclick = () => {
+      const form = byId("modalForm");
+      const urlInput = form.querySelector('[name="url"]');
+      const result = extractLatLngFromMapsUrl(urlInput?.value);
+      if(result){
+        form.querySelector('[name="lat"]').value = result.lat;
+        form.querySelector('[name="lng"]').value = result.lng;
+        showToast("Coordenadas preenchidas");
+      }else{
+        alert("Não encontrei latitude/longitude neste link. Link curto maps.app.goo.gl funciona como link externo, mas para criar pino no mapa é melhor colar uma URL completa com @latitude,longitude ou preencher as coordenadas manualmente.");
+      }
+    };
+  }, 80);
+}
+
+function openReservationModal(res=null){
+  const r = res || { id: uid(), type:"Hospedagem", title:"", status:"Pendente", city:"", date:"", time:"", endTime:"", endDate:"", amount:0, paid:0, dayId:"", link:"", location:"", notes:"" };
+  openModal(res ? "Editar reserva" : "Nova reserva", `<div class="form-grid">
+    ${selectInput("type", "Tipo", r.type, ["Voo","Hospedagem","Carro","Trem/ônibus","Passeio","Restaurante","Seguro","Outro"])}
+    ${selectInput("status", "Status", r.status, ["Pendente","Reservado","Pago","Cancelado"])}
+    <div class="full">${input("title", "Título", r.title, "text", "required")}</div>
+    ${input("city", "Cidade", r.city)}
+    ${input("date", "Data inicial", r.date, "text", 'placeholder="27/07"')}
+    ${input("time", "Horário início", r.time, "time")}
+    ${input("endTime", "Horário fim", r.endTime || "", "time")}
+    ${input("endDate", "Data final", r.endDate)}
+    ${selectInput("dayId", "Vincular ao dia", r.dayId, dayOptions(true))}
+    <div class="full">${input("location", "Localização para Google Agenda", r.location || r.city)}</div>
+    ${input("amount", "Valor previsto", r.amount, "number", 'step="0.01"')}
+    ${input("paid", "Valor pago", r.paid, "number", 'step="0.01"')}
+    <div class="full">${input("link", "Link da reserva / Google Maps / Booking", r.link, "url")}</div>
+    <div class="full">${textarea("notes", "Observações", r.notes)}</div>
+  </div>`, fd => {
+    const payload = {
+      id:r.id, type:fd.get("type").toString(), status:fd.get("status").toString(), title:fd.get("title").toString().trim(), city:fd.get("city").toString().trim(), date:fd.get("date").toString().trim(), time:fd.get("time").toString().trim(), endTime:fd.get("endTime").toString().trim(), endDate:fd.get("endDate").toString().trim(), dayId:fd.get("dayId").toString(), location:fd.get("location").toString().trim(), amount:Number(fd.get("amount")||0), paid:Number(fd.get("paid")||0), link:fd.get("link").toString().trim(), notes:fd.get("notes").toString().trim()
+    };
+    if(res) Object.assign(res, payload); else data.reservations.push(payload);
+    closeModal(); saveAndRender("Reserva salva");
+  });
+}
+
+function renderSettings(){
+  byId("settingsPanel").innerHTML = `<div class="settings-grid">
+      <div class="settings-box">
+        <h3>Modo atual</h3>
+        <p class="muted">Hoje esta versão salva no navegador usando localStorage. Funciona no GitHub Pages sem custo.</p>
+        <label>Modo de sincronização
+          <select id="settingSyncMode">
+            <option value="local" ${data.settings.syncMode === "local" ? "selected" : ""}>Local neste navegador</option>
+            <option value="sheets" ${data.settings.syncMode === "sheets" ? "selected" : ""}>Preparar Google Sheets + Apps Script</option>
+          </select>
+        </label>
+        <label>URL do Apps Script Web App
+          <input id="settingAppsScriptUrl" value="${escapeAttr(data.settings.appsScriptUrl || "")}" placeholder="Cole aqui futuramente a URL /exec" />
+        </label>
+        <label>Pasta do Google Drive para documentos
+          <input id="settingDriveFolderUrl" value="${escapeAttr(data.settings.driveFolderUrl || "")}" placeholder="Link da pasta no Drive" />
+        </label>
+      </div>
+      <div class="settings-box calendar-box">
+        <h3>Calendário compartilhado</h3>
+        <p class="muted">Crie uma agenda exclusiva no Google Agenda e compartilhe com sua esposa. Depois, cada botão Google Agenda abrirá um evento já preenchido.</p>
+        <label>Nome sugerido da agenda
+          <input id="settingGoogleCalendarName" value="${escapeAttr(data.settings.googleCalendarName || "")}" placeholder="Viagem Mendoza & Buenos Aires 2026" />
+        </label>
+        <label>Link da agenda compartilhada
+          <input id="settingGoogleCalendarUrl" value="${escapeAttr(data.settings.googleCalendarUrl || "")}" placeholder="Cole o link da agenda, se quiser" />
+        </label>
+        <label>Fuso horário
+          <input id="settingCalendarTimezone" value="${escapeAttr(data.settings.calendarTimezone || "America/Sao_Paulo")}" placeholder="America/Sao_Paulo" />
+        </label>
+        <div class="card-actions">
+          <button class="secondary" onclick="openCalendarSetupModal()">Como criar agenda</button>
+          ${data.settings.googleCalendarUrl ? `<a class="secondary" href="${escapeAttr(data.settings.googleCalendarUrl)}" target="_blank" rel="noopener">Abrir agenda</a>` : `<a class="secondary" href="https://calendar.google.com/calendar/u/0/r/settings/createcalendar" target="_blank" rel="noopener">Criar agenda no Google</a>`}
+        </div>
+      </div>
+      <div class="settings-box">
+        <h3>Modelo da planilha futura</h3>
+        <p class="muted">Quando formos conectar ao Google Sheets, a planilha deverá ter estas abas:</p>
+        <div class="code-block">Config\nDias\nLugares\nAgenda\nReservas\nDocumentos\nDespesas\nPendencias</div>
+      </div>
+      <div class="settings-box">
+        <h3>Google Maps</h3>
+        <p class="muted">Cole o link compartilhado do Maps no cadastro do lugar. O botão Google Maps abrirá o local. Para aparecer como pino dentro do mapa da plataforma, cadastre latitude e longitude.</p>
+        <div class="code-block">Fluxo recomendado:\nGoogle Maps → Compartilhar → Copiar link\nCentral de Viagem → Lugares → + Novo lugar → Link Google Maps\nSe tiver coordenadas, preencha Latitude/Longitude para aparecer no mapa interno.</div>
+      </div>
+      <div class="settings-box">
+        <h3>Backup</h3>
+        <p class="muted">Use exportar/importar para levar os dados para outro navegador enquanto ainda não há sincronização online.</p>
+        <div class="card-actions">
+          <button class="secondary" onclick="exportJson()">Exportar JSON</button>
+          <label class="secondary file-label" for="importJson">Importar JSON</label>
+        </div>
+      </div>
+      <div class="settings-box">
+        <h3>Próxima fase</h3>
+        <p class="muted">Após aprovar calendário/mapa, conectamos Google Sheets + Apps Script para sincronizar a família toda.</p>
+      </div>
+    </div>`;
+}
+
+function saveSettingsFromPanel(){
+  data.settings.syncMode = byId("settingSyncMode")?.value || "local";
+  data.settings.appsScriptUrl = byId("settingAppsScriptUrl")?.value.trim() || "";
+  data.settings.driveFolderUrl = byId("settingDriveFolderUrl")?.value.trim() || "";
+  data.settings.googleCalendarName = byId("settingGoogleCalendarName")?.value.trim() || "";
+  data.settings.googleCalendarUrl = byId("settingGoogleCalendarUrl")?.value.trim() || "";
+  data.settings.calendarTimezone = byId("settingCalendarTimezone")?.value.trim() || "America/Sao_Paulo";
+  saveAndRender("Configurações salvas");
+}
+
+function init(){
+  ensureV52Defaults();
+  bindEvents();
+  renderAll();
+  initMap();
+  setTimeout(renderMapMarkers, 250);
+}
+
 
 document.addEventListener("DOMContentLoaded", init);

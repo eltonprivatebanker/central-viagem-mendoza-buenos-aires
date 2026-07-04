@@ -1,75 +1,35 @@
-# Central de Viagem — v5 Sistema Completo
+# Central de Viagem — v5.2 Calendário + Google Maps
 
-Projeto estático em HTML, CSS e JavaScript para organizar uma viagem com aparência de sistema visual inspirado em plataformas como Wanderlog.
+Projeto estático em HTML, CSS e JavaScript para organizar a viagem Mendoza & Buenos Aires.
 
-## O que esta versão inclui
+## Novidades da v5.2
 
-- Visão geral da viagem
-- Itinerário por dia, com manhã/tarde/noite
-- Cadastro, edição, duplicação, exclusão e reordenação de dias
-- Lugares para visitar com cidade, categoria, status, prioridade, dia, período e coordenadas
-- Mapa integrado com Leaflet/OpenStreetMap
-- Reservas e compromissos
-- Documentos e anexos
-- Upload local de arquivos pequenos no navegador
-- Links externos para Google Drive, Booking, Maps etc.
-- Orçamento e despesas
-- Pendências/checklist
-- Exportar e importar backup JSON
-- Área de configurações preparada para futura integração com Google Sheets + Apps Script
+- Integração prática com Google Agenda por link de criação de evento.
+- Botão **Google Agenda** em dias, lugares e reservas.
+- Geração de arquivo `.ics` para importar em outros calendários.
+- Campos de horário início/fim nos lugares e reservas.
+- Campo de localização para o evento do Google Agenda.
+- Campo de ano da viagem para montar datas corretamente.
+- Configurações para nome/link da agenda compartilhada.
+- Melhor suporte a links do Google Maps.
+- Botão para tentar extrair coordenadas quando a URL completa do Maps tiver `@latitude,longitude`.
 
-## Como publicar no GitHub Pages
+## Como usar a agenda compartilhada
 
-1. Extraia o ZIP.
-2. Entre no repositório `central-viagem-mendoza-buenos-aires`.
-3. Clique em **Add file → Upload files**.
-4. Suba os arquivos de dentro da pasta extraída.
-5. Confirme em **Commit changes**.
-6. Aguarde o GitHub Pages atualizar.
+1. Crie uma agenda exclusiva no Google Agenda, por exemplo: `Viagem Mendoza & Buenos Aires 2026`.
+2. Compartilhe com sua esposa com permissão para editar eventos.
+3. Na Central de Viagem, cadastre os dias, lugares e reservas.
+4. Use o botão **Google Agenda** em cada card.
+5. O Google Agenda abre com título, data, local e observações preenchidas.
+6. Antes de salvar, escolha a agenda da viagem.
 
-A página deve ficar disponível em:
+## Como usar o Google Maps
 
-```text
-https://eltonprivatebanker.github.io/central-viagem-mendoza-buenos-aires/
-```
+- Em **Lugares**, cole o link compartilhado do Google Maps.
+- O link curto `maps.app.goo.gl` funciona para abrir o Maps.
+- Para aparecer como pino dentro do mapa da plataforma, preencha latitude e longitude.
+- Se você colar uma URL completa do Maps com `@lat,lng`, clique em **Tentar preencher coordenadas pelo link**.
 
-## Importante sobre salvamento
+## Limitação atual
 
-Nesta fase, a página salva os dados no próprio navegador usando `localStorage`.
-
-Isso significa:
-
-- Editou no notebook: fica salvo no notebook.
-- Abriu no celular: ainda não sincroniza automaticamente.
-- Para migrar dados: use **Exportar backup** e **Importar backup**.
-
-Para sincronização real entre celular, notebook e família, a próxima etapa é conectar com:
-
-- Google Sheets para os dados;
-- Google Drive para documentos;
-- Apps Script como backend gratuito.
-
-## Próxima etapa sugerida
-
-Criar uma planilha com as abas:
-
-```text
-Config
-Dias
-Lugares
-Agenda
-Reservas
-Documentos
-Despesas
-Pendencias
-```
-
-Depois criar um Apps Script para ler e gravar essas abas a partir da página.
-
-
-## v5.1 — correção do modal inicial
-
-Correção aplicada:
-- o modal base de edição não aparece mais ao carregar a página;
-- adicionado CSS `[hidden]{display:none!important;}` para impedir que `.modal-backdrop{display:grid}` sobrescreva o atributo `hidden`;
-- `index.html` passou a chamar `style.css` e `app.js` com versão `v5-1-modal-fix`, reduzindo risco de cache antigo no GitHub Pages.
+A plataforma ainda salva dados no navegador via `localStorage`. Para sincronizar automaticamente celular/notebook/família, a próxima etapa é conectar Google Sheets + Apps Script e Google Drive.

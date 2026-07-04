@@ -65,6 +65,47 @@ let currentView = "overview";
 let selectedPlaceId = null;
 let map = null;
 let markersLayer = null;
+let mapTileLayer = null;
+let mapResizeObserver = null;
+let mapResizeCycle = 0;
+const DEFAULT_MAP_CENTER = [-34.6037, -58.3816];
+
+function forceMapRefresh(reason = ""){
+  if(!map) return;
+  const mapEl = byId("map");
+  if(!mapEl) return;
+  mapResizeCycle += 1;
+  const cycle = mapResizeCycle;
+  [40, 140, 320, 700].forEach(delay => {
+    setTimeout(() => {
+      if(cycle !== mapResizeCycle && delay > 140) return;
+      try{ map.invalidateSize({ pan:false }); }catch(err){ console.warn("Falha ao recalcular mapa", reason, err); }
+    }, delay);
+  });
+}
+
+function reloadMapTiles(showMessage = true){
+  if(!window.L){
+    byId("mapFallback").hidden = false;
+    return;
+  }
+  if(!map){
+    initMap();
+  }
+  forceMapRefresh("reload-manual");
+  setTimeout(() => {
+    try{
+      if(mapTileLayer && typeof mapTileLayer.redraw === "function") mapTileLayer.redraw();
+      renderMapMarkers();
+      fitMap(false);
+      forceMapRefresh("reload-after-redraw");
+      if(showMessage) showToast("Mapa recarregado");
+    }catch(err){
+      console.warn("Falha ao recarregar mapa", err);
+      if(showMessage) showToast("Não consegui recarregar o mapa agora");
+    }
+  }, 180);
+}
 
 function structuredCloneSafe(obj){ return JSON.parse(JSON.stringify(obj)); }
 function loadData(){
@@ -143,7 +184,7 @@ function init(){
   bindEvents();
   renderAll();
   initMap();
-  setTimeout(renderMapMarkers, 250);
+  setTimeout(() => { renderMapMarkers(); forceMapRefresh("init-final"); }, 250);
 }
 
 function bindEvents(){
@@ -159,7 +200,8 @@ function bindEvents(){
   byId("btnAddDocument").onclick = () => openDocumentModal();
   byId("btnAddExpense").onclick = () => openExpenseModal();
   byId("btnSaveSettings").onclick = saveSettingsFromPanel;
-  byId("btnFitMap").onclick = fitMap;
+  byId("btnFitMap").onclick = () => { forceMapRefresh("fit-click"); setTimeout(() => fitMap(true), 160); };
+  byId("btnReloadMap") && (byId("btnReloadMap").onclick = () => reloadMapTiles(true));
   byId("btnAddMapCenter").onclick = () => {
     const center = map ? map.getCenter() : { lat: -34.6037, lng: -58.3816 };
     openPlaceModal(null, { lat: center.lat, lng: center.lng });
@@ -179,7 +221,7 @@ function setView(view){
   currentView = view;
   document.querySelectorAll(".nav-item").forEach(btn => btn.classList.toggle("active", btn.dataset.view === view));
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === `view-${view}`));
-  setTimeout(() => map?.invalidateSize(), 120);
+  forceMapRefresh(`view-${view}`);
 }
 
 function renderAll(){
@@ -497,13 +539,52 @@ function saveSettingsFromPanel(){
 }
 
 function initMap(){
+  const fallback = byId("mapFallback");
+  const mapEl = byId("map");
+  if(!mapEl) return;
   if(!window.L){
-    byId("mapFallback").hidden = false;
+    if(fallback) fallback.hidden = false;
+    return;
+  }
+  if(map){
+    forceMapRefresh("init-existing");
     return;
   }
   try{
-    map = L.map("map", { zoomControl:true, scrollWheelZoom:true }).setView([-34.6037, -58.3816], 4);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:19, attribution:"&copy; OpenStreetMap" }).addTo(map);
+    if(fallback) fallback.hidden = true;
+    mapEl.classList.add("map-loading");
+    map = L.map("map", {
+      zoomControl:true,
+      scrollWheelZoom:true,
+      worldCopyJump:true,
+      preferCanvas:true
+    }).setView(DEFAULT_MAP_CENTER, 4);
+
+    // Camada gratuita mais estável visualmente que os tiles padrão do OSM.
+    // Continua usando dados do OpenStreetMap, mas servidos como base Carto.
+    mapTileLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      maxZoom:19,
+      minZoom:2,
+      subdomains:"abcd",
+      detectRetina:true,
+      updateWhenIdle:true,
+      keepBuffer:4,
+      attribution:'&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(map);
+
+    let loadedOnce = false;
+    mapTileLayer.on("load", () => {
+      loadedOnce = true;
+      mapEl.classList.remove("map-loading");
+      if(fallback) fallback.hidden = true;
+      forceMapRefresh("tile-load");
+    });
+    mapTileLayer.on("tileerror", () => {
+      // Não bloqueia o mapa por erro pontual de tile; apenas permite recarregar manualmente.
+      mapEl.classList.add("map-has-tile-error");
+      setTimeout(() => { if(!loadedOnce && fallback) fallback.hidden = false; }, 1800);
+    });
+
     markersLayer = L.layerGroup().addTo(map);
     map.on("click", event => {
       if(currentView === "places"){
@@ -511,9 +592,20 @@ function initMap(){
         openPlaceModal(null, { lat, lng });
       }
     });
+
+    if("ResizeObserver" in window){
+      mapResizeObserver?.disconnect();
+      mapResizeObserver = new ResizeObserver(() => forceMapRefresh("resize-observer"));
+      mapResizeObserver.observe(mapEl);
+      document.querySelector(".map-panel") && mapResizeObserver.observe(document.querySelector(".map-panel"));
+      document.querySelector(".workspace") && mapResizeObserver.observe(document.querySelector(".workspace"));
+    }
+    window.addEventListener("resize", () => forceMapRefresh("window-resize"));
+    document.addEventListener("visibilitychange", () => { if(!document.hidden) forceMapRefresh("visibility"); });
+    setTimeout(() => { forceMapRefresh("init-delayed"); renderMapMarkers(); }, 300);
   }catch(err){
     console.warn("Falha ao iniciar mapa", err);
-    byId("mapFallback").hidden = false;
+    if(fallback) fallback.hidden = false;
   }
 }
 function renderMapMarkers(){
@@ -530,12 +622,14 @@ function renderMapMarkers(){
   });
   if(!selectedPlaceId && coords.length) fitMap(false);
   renderSelectedPlaceBox();
+  forceMapRefresh("markers-rendered");
 }
 window.selectPlaceFromPopup = function(id){ selectPlace(id, false); };
 function selectPlace(id, fly=true){
   selectedPlaceId = id;
   const place = data.places.find(p => p.id === id);
   if(place && map && fly){
+    forceMapRefresh("select-place");
     const lat = Number(place.lat), lng = Number(place.lng);
     if(Number.isFinite(lat) && Number.isFinite(lng)) map.flyTo([lat,lng], Math.max(map.getZoom(), 12), { duration:.7 });
   }
@@ -562,7 +656,15 @@ function fitMap(showMessage=true){
   if(!map || !markersLayer) return;
   const latlngs = data.places.map(p => [Number(p.lat), Number(p.lng)]).filter(([lat,lng]) => Number.isFinite(lat) && Number.isFinite(lng));
   if(!latlngs.length){ if(showMessage) showToast("Nenhum lugar com coordenadas"); return; }
-  map.fitBounds(latlngs, { padding:[38,38], maxZoom:12 });
+  forceMapRefresh("fit-before");
+  setTimeout(() => {
+    try{
+      map.fitBounds(latlngs, { padding:[38,38], maxZoom:12 });
+      forceMapRefresh("fit-after");
+    }catch(err){
+      console.warn("Falha ao aproximar mapa", err);
+    }
+  }, 120);
 }
 
 function input(name, label, value="", type="text", attrs=""){
@@ -1391,7 +1493,7 @@ function init(){
   bindEvents();
   renderAll();
   initMap();
-  setTimeout(renderMapMarkers, 250);
+  setTimeout(() => { renderMapMarkers(); forceMapRefresh("init-final"); }, 250);
 }
 
 
@@ -1659,5 +1761,5 @@ function init(){
   bindEvents();
   renderAll();
   initMap();
-  setTimeout(renderMapMarkers, 250);
+  setTimeout(() => { renderMapMarkers(); forceMapRefresh("init-final"); }, 250);
 }

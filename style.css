@@ -46,3 +46,49 @@ a{color:var(--gold-2);text-decoration:none}.app-shell{display:grid;grid-template
 @media (max-width: 760px){
   .stack-actions .secondary, .stack-actions .primary { width: 100%; justify-content: center; }
 }
+
+
+/* v6.1 — correção do mapa Leaflet/OpenStreetMap/Carto */
+.map{
+  position:relative;
+  min-height:620px;
+  isolation:isolate;
+  background:#dbe8ef;
+}
+.map.leaflet-container{
+  background:#dbe8ef;
+}
+.map-loading::after{
+  content:"Carregando mapa...";
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  z-index:500;
+  padding:10px 14px;
+  border-radius:999px;
+  background:rgba(10,20,36,.84);
+  border:1px solid rgba(255,255,255,.18);
+  color:#f6f8fc;
+  font-weight:900;
+  pointer-events:none;
+}
+.map-card{
+  overflow:hidden;
+}
+.map-actions{
+  justify-content:flex-end;
+}
+.map-actions .tiny{
+  white-space:nowrap;
+}
+.leaflet-tile-container img{
+  image-rendering:auto;
+}
+@media (max-width:1180px){
+  .map{min-height:430px;}
+}
+@media (max-width:760px){
+  .map{min-height:360px;}
+  .map-actions{justify-content:flex-start;}
+}

@@ -1,39 +1,67 @@
-# Central de Viagem — v4 Visual Map
+# Central de Viagem — v5 Sistema Completo
 
-Planner visual de viagem inspirado em plataformas como Wanderlog, mas estático e editável via GitHub Pages.
+Projeto estático em HTML, CSS e JavaScript para organizar uma viagem com aparência de sistema visual inspirado em plataformas como Wanderlog.
 
-## Principais recursos
+## O que esta versão inclui
 
 - Visão geral da viagem
-- Itinerário dia a dia
-- Lugares para visitar
+- Itinerário por dia, com manhã/tarde/noite
+- Cadastro, edição, duplicação, exclusão e reordenação de dias
+- Lugares para visitar com cidade, categoria, status, prioridade, dia, período e coordenadas
 - Mapa integrado com Leaflet/OpenStreetMap
-- Vinculação de lugar ao dia e período da agenda
-- Reservas
-- Documentos com link externo
+- Reservas e compromissos
+- Documentos e anexos
+- Upload local de arquivos pequenos no navegador
+- Links externos para Google Drive, Booking, Maps etc.
 - Orçamento e despesas
-- Exportar/importar JSON
-- Salvamento automático no navegador via localStorage
+- Pendências/checklist
+- Exportar e importar backup JSON
+- Área de configurações preparada para futura integração com Google Sheets + Apps Script
 
-## Limitação importante
+## Como publicar no GitHub Pages
 
-O GitHub Pages é estático. Portanto, as edições feitas na tela ficam salvas no navegador usado, não no GitHub automaticamente.
+1. Extraia o ZIP.
+2. Entre no repositório `central-viagem-mendoza-buenos-aires`.
+3. Clique em **Add file → Upload files**.
+4. Suba os arquivos de dentro da pasta extraída.
+5. Confirme em **Commit changes**.
+6. Aguarde o GitHub Pages atualizar.
 
-Para sincronizar entre celular, notebook e família, evoluir depois para:
+A página deve ficar disponível em:
 
-- Google Sheets + Apps Script
-- Supabase
-- Firebase
-- GitHub API
+```text
+https://eltonprivatebanker.github.io/central-viagem-mendoza-buenos-aires/
+```
 
-## Como publicar
+## Importante sobre salvamento
 
-Suba estes arquivos na raiz do repositório:
+Nesta fase, a página salva os dados no próprio navegador usando `localStorage`.
 
-- index.html
-- style.css
-- app.js
-- README.md
-- .nojekyll
+Isso significa:
 
-Depois ative GitHub Pages na branch `main`, pasta `/root`.
+- Editou no notebook: fica salvo no notebook.
+- Abriu no celular: ainda não sincroniza automaticamente.
+- Para migrar dados: use **Exportar backup** e **Importar backup**.
+
+Para sincronização real entre celular, notebook e família, a próxima etapa é conectar com:
+
+- Google Sheets para os dados;
+- Google Drive para documentos;
+- Apps Script como backend gratuito.
+
+## Próxima etapa sugerida
+
+Criar uma planilha com as abas:
+
+```text
+Config
+Dias
+Lugares
+Agenda
+Reservas
+Documentos
+Despesas
+Pendencias
+```
+
+Depois criar um Apps Script para ler e gravar essas abas a partir da página.

@@ -1,35 +1,32 @@
-# Central de Viagem — v5.2 Calendário + Google Maps
+# Central de Viagem — v6 Google Sheets + Agenda
 
-Projeto estático em HTML, CSS e JavaScript para organizar a viagem Mendoza & Buenos Aires.
+Sistema visual editável para planejar viagem com roteiro, lugares, mapa, reservas, documentos, orçamento e pendências.
 
-## Novidades da v5.2
+## Novidades da v6
 
-- Integração prática com Google Agenda por link de criação de evento.
-- Botão **Google Agenda** em dias, lugares e reservas.
-- Geração de arquivo `.ics` para importar em outros calendários.
-- Campos de horário início/fim nos lugares e reservas.
-- Campo de localização para o evento do Google Agenda.
-- Campo de ano da viagem para montar datas corretamente.
-- Configurações para nome/link da agenda compartilhada.
-- Melhor suporte a links do Google Maps.
-- Botão para tentar extrair coordenadas quando a URL completa do Maps tiver `@latitude,longitude`.
+- Edição continua acontecendo pela própria tela.
+- Integração opcional com Google Sheets via Apps Script.
+- Botões para salvar/carregar dados da nuvem.
+- Botão para criar evento direto na agenda compartilhada.
+- Upload de documento para pasta do Google Drive via Apps Script.
+- Arquivo `google-apps-script/Code.gs` incluído no ZIP.
+- Guia completo em `INSTRUCOES_GOOGLE_SHEETS_E_AGENDA.md`.
 
-## Como usar a agenda compartilhada
+## Estrutura
 
-1. Crie uma agenda exclusiva no Google Agenda, por exemplo: `Viagem Mendoza & Buenos Aires 2026`.
-2. Compartilhe com sua esposa com permissão para editar eventos.
-3. Na Central de Viagem, cadastre os dias, lugares e reservas.
-4. Use o botão **Google Agenda** em cada card.
-5. O Google Agenda abre com título, data, local e observações preenchidas.
-6. Antes de salvar, escolha a agenda da viagem.
+```text
+index.html
+style.css
+app.js
+dados/viagem.json
+google-apps-script/Code.gs
+google-apps-script/appsscript.json
+INSTRUCOES_GOOGLE_SHEETS_E_AGENDA.md
+.nojekyll
+```
 
-## Como usar o Google Maps
+## Publicação
 
-- Em **Lugares**, cole o link compartilhado do Google Maps.
-- O link curto `maps.app.goo.gl` funciona para abrir o Maps.
-- Para aparecer como pino dentro do mapa da plataforma, preencha latitude e longitude.
-- Se você colar uma URL completa do Maps com `@lat,lng`, clique em **Tentar preencher coordenadas pelo link**.
+Suba `index.html`, `style.css`, `app.js`, `dados/` e `.nojekyll` no GitHub Pages.
 
-## Limitação atual
-
-A plataforma ainda salva dados no navegador via `localStorage`. Para sincronizar automaticamente celular/notebook/família, a próxima etapa é conectar Google Sheets + Apps Script e Google Drive.
+Os arquivos da pasta `google-apps-script/` são para copiar no Apps Script, não precisam ser usados pelo GitHub Pages.

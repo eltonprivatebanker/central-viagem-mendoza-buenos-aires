@@ -34,3 +34,15 @@ a{color:var(--gold-2);text-decoration:none}.app-shell{display:grid;grid-template
 
 /* v5.2 — ajustes visuais para agenda compartilhada e mapas */
 .calendar-box{border-color:rgba(141,184,255,.36);background:linear-gradient(180deg,rgba(141,184,255,.10),rgba(17,29,48,.66))}.full-helper{grid-column:1/-1}.card-actions a.secondary{display:inline-flex;align-items:center;justify-content:center}.card-actions button:disabled{opacity:.45;cursor:not-allowed}.mini-place .ghost.tiny{margin-top:6px}.form-grid p.muted{margin:0;line-height:1.45}.settings-box .card-actions{margin-top:12px}.card .card-actions .ghost,.card .card-actions .secondary{white-space:nowrap}@media (max-width:760px){.card-actions .ghost.tiny,.card-actions .secondary{width:100%;justify-content:center}.modal{max-height:92vh}.map-card{padding:12px}}
+
+
+/* v6 — integrações */
+.sync-box { border-color: rgba(117, 197, 255, .35); }
+.cloud-action { border-color: rgba(116, 255, 180, .28) !important; color: #b8ffd4 !important; }
+.stack-actions { gap: 8px; flex-wrap: wrap; }
+.checkbox-line { display:flex !important; flex-direction:row !important; align-items:center; gap:10px; }
+.checkbox-line input { width:auto !important; }
+.settings-box .code-block { white-space: pre-wrap; }
+@media (max-width: 760px){
+  .stack-actions .secondary, .stack-actions .primary { width: 100%; justify-content: center; }
+}

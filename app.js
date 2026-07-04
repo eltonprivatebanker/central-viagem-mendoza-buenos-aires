@@ -1,5 +1,5 @@
-/* Central de Viagem v5.2 — calendário compartilhado + Google Maps
-   GitHub Pages + localStorage agora. Preparado para evoluir para Google Sheets/Drive via Apps Script. */
+/* Central de Viagem v6 — edição na tela + integração opcional Google Sheets, Drive e Agenda
+   GitHub Pages continua como interface. Google Apps Script pode virar backend gratuito. */
 const STORAGE_KEY = "centralViagemV5Completo"; // mantido para migrar dados locais da v5/v5.1
 const uid = () => `${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36).slice(-5)}`;
 
@@ -19,7 +19,12 @@ const defaultData = {
     editorPasswordHint: "",
     googleCalendarName: "Viagem Mendoza & Buenos Aires 2026",
     googleCalendarUrl: "",
-    calendarTimezone: "America/Sao_Paulo"
+    calendarTimezone: "America/Sao_Paulo",
+    calendarId: "",
+    apiKey: "",
+    autoSync: false,
+    lastSyncAt: "",
+    driveFolderId: ""
   },
   days: [
     { id: "d1", number: 1, label: "Seg 27/07", date: "27/07", title: "Saída da viagem", city: "Deslocamento", morning: "Conferir documentos, malas, dinheiro/cartões e deslocamento até o ponto de saída.", afternoon: "Viagem/deslocamento. Guardar comprovantes e localizadores.", night: "Chegada e check-in, se aplicável. Jantar leve.", lodging: "A definir", transport: "Deslocamento inicial", notes: "" },
@@ -400,9 +405,11 @@ function renderDocuments(){
       <p>${escapeHtml(doc.notes || "Sem observações.")}</p>
       <p class="muted"><strong>Dia:</strong> ${dayLabel(doc.dayId)}</p>
       ${doc.file ? `<div class="file-chip"><span>📎 ${escapeHtml(doc.file.name)} · ${fileSize(doc.file.size)}</span><button class="ghost tiny" data-download-doc="${doc.id}">Baixar</button></div>` : ""}
+      ${doc.driveFileId ? `<p class="muted"><strong>Drive:</strong> arquivo enviado para a pasta configurada.</p>` : ""}
       <div class="card-actions">
         <button class="ghost tiny" data-edit-doc="${doc.id}">Editar / anexar</button>
         ${doc.link ? `<a class="ghost tiny" href="${escapeAttr(doc.link)}" target="_blank" rel="noopener">Abrir link</a>` : ""}
+        ${doc.file && cloudConfigured() ? `<button class="ghost tiny" data-upload-drive="${doc.id}">Enviar ao Drive</button>` : ""}
         ${doc.file ? `<button class="ghost tiny danger" data-remove-file="${doc.id}">Remover arquivo</button>` : ""}
         <button class="ghost tiny danger" data-delete-doc="${doc.id}">Excluir</button>
       </div>
@@ -411,6 +418,7 @@ function renderDocuments(){
   document.querySelectorAll("[data-delete-doc]").forEach(el => el.onclick = () => deleteItem("documents", el.dataset.deleteDoc, "Excluir documento?"));
   document.querySelectorAll("[data-remove-file]").forEach(el => el.onclick = () => removeDocumentFile(el.dataset.removeFile));
   document.querySelectorAll("[data-download-doc]").forEach(el => el.onclick = () => downloadDocumentFile(el.dataset.downloadDoc));
+  document.querySelectorAll("[data-upload-drive]").forEach(el => el.onclick = () => uploadDocumentToDrive(el.dataset.uploadDrive));
 }
 function renderBudget(){
   const expectedExpenses = data.expenses.reduce((s,e)=>s+Number(e.expected||0),0);
@@ -1093,6 +1101,7 @@ function renderItinerary(){
         <div class="card-actions">
           <span class="tag blue">${escapeHtml(day.city || "Etapa")}</span>
           <button class="ghost tiny" data-day-calendar="${day.id}">Google Agenda</button>
+          ${cloudCalendarButton("day", day.id)}
           <button class="ghost tiny" data-day-ics="${day.id}">.ics</button>
           <button class="ghost tiny" data-move-day="${day.id}" data-dir="up" ${idx===0?"disabled":""}>↑</button>
           <button class="ghost tiny" data-move-day="${day.id}" data-dir="down" ${idx===sorted.length-1?"disabled":""}>↓</button>
@@ -1121,6 +1130,7 @@ function renderItinerary(){
   document.querySelectorAll("[data-edit-reservation]").forEach(el => el.onclick = () => openReservationModal(data.reservations.find(r => r.id === el.dataset.editReservation)));
   document.querySelectorAll("[data-day-calendar]").forEach(el => el.onclick = () => openGoogleCalendarForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayCalendar))));
   document.querySelectorAll("[data-day-ics]").forEach(el => el.onclick = () => downloadIcsForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayIcs)), `dia-${el.dataset.dayIcs}.ics`));
+  document.querySelectorAll("[data-day-cloud-calendar]").forEach(el => el.onclick = () => createCloudCalendarEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayCloudCalendar))));
 }
 
 function renderPlaces(){
@@ -1139,6 +1149,7 @@ function renderPlaces(){
       <div class="card-actions">
         <button class="ghost tiny" data-card-place="${place.id}">Ver no mapa</button>
         <button class="ghost tiny" data-place-calendar="${place.id}">Google Agenda</button>
+        ${cloudCalendarButton("place", place.id)}
         <button class="ghost tiny" data-place-ics="${place.id}">.ics</button>
         <button class="ghost tiny" data-edit-place="${place.id}">Editar</button>
         ${place.url ? `<button class="ghost tiny" data-open-maps="${place.id}">Google Maps</button><button class="ghost tiny" data-copy-maps="${place.id}">Copiar Maps</button>` : ""}
@@ -1150,6 +1161,7 @@ function renderPlaces(){
   document.querySelectorAll("[data-delete-place]").forEach(el => el.onclick = () => deleteItem("places", el.dataset.deletePlace, "Excluir este lugar?"));
   document.querySelectorAll("[data-place-calendar]").forEach(el => el.onclick = () => openGoogleCalendarForEvent(placeCalendarEvent(data.places.find(p => p.id === el.dataset.placeCalendar))));
   document.querySelectorAll("[data-place-ics]").forEach(el => el.onclick = () => downloadIcsForEvent(placeCalendarEvent(data.places.find(p => p.id === el.dataset.placeIcs)), `lugar-${el.dataset.placeIcs}.ics`));
+  document.querySelectorAll("[data-place-cloud-calendar]").forEach(el => el.onclick = () => createCloudCalendarEvent(placeCalendarEvent(data.places.find(p => p.id === el.dataset.placeCloudCalendar))));
   document.querySelectorAll("[data-open-maps]").forEach(el => el.onclick = () => openMapsLink(data.places.find(p => p.id === el.dataset.openMaps)?.url));
   document.querySelectorAll("[data-copy-maps]").forEach(el => el.onclick = () => copyText(data.places.find(p => p.id === el.dataset.copyMaps)?.url));
   renderMapMarkers();
@@ -1168,6 +1180,7 @@ function renderReservations(){
       <p class="muted"><strong>Data:</strong> ${escapeHtml(res.date || "—")} ${res.time ? `· ${escapeHtml(res.time)}` : ""}${res.endTime ? `–${escapeHtml(res.endTime)}` : ""} ${res.endDate ? `até ${escapeHtml(res.endDate)}` : ""}<br><strong>Dia:</strong> ${dayLabel(res.dayId)}<br><strong>Local:</strong> ${escapeHtml(res.location || res.city || "—")}</p>
       <div class="card-actions">
         <button class="ghost tiny" data-res-calendar="${res.id}">Google Agenda</button>
+        ${cloudCalendarButton("res", res.id)}
         <button class="ghost tiny" data-res-ics="${res.id}">.ics</button>
         <button class="ghost tiny" data-edit-res="${res.id}">Editar</button>
         ${res.link ? `<a class="ghost tiny" href="${escapeAttr(res.link)}" target="_blank" rel="noopener">Abrir link</a>` : ""}
@@ -1178,6 +1191,7 @@ function renderReservations(){
   document.querySelectorAll("[data-delete-res]").forEach(el => el.onclick = () => deleteItem("reservations", el.dataset.deleteRes, "Excluir reserva?"));
   document.querySelectorAll("[data-res-calendar]").forEach(el => el.onclick = () => openGoogleCalendarForEvent(reservationCalendarEvent(data.reservations.find(r => r.id === el.dataset.resCalendar))));
   document.querySelectorAll("[data-res-ics]").forEach(el => el.onclick = () => downloadIcsForEvent(reservationCalendarEvent(data.reservations.find(r => r.id === el.dataset.resIcs)), `reserva-${el.dataset.resIcs}.ics`));
+  document.querySelectorAll("[data-res-cloud-calendar]").forEach(el => el.onclick = () => createCloudCalendarEvent(reservationCalendarEvent(data.reservations.find(r => r.id === el.dataset.resCloudCalendar))));
 }
 
 function renderSelectedPlaceBox(){
@@ -1382,3 +1396,268 @@ function init(){
 
 
 document.addEventListener("DOMContentLoaded", init);
+
+
+/* ===== v6 — Google Sheets / Drive / Agenda via Apps Script ===== */
+let cloudSaveTimer = null;
+function ensureV6Defaults(){
+  data.settings = data.settings || {};
+  data.settings.syncMode = data.settings.syncMode || "local";
+  data.settings.appsScriptUrl = data.settings.appsScriptUrl || "";
+  data.settings.apiKey = data.settings.apiKey || "";
+  data.settings.autoSync = Boolean(data.settings.autoSync);
+  data.settings.lastSyncAt = data.settings.lastSyncAt || "";
+  data.settings.googleCalendarName = data.settings.googleCalendarName || "Viagem Mendoza & Buenos Aires 2026";
+  data.settings.calendarTimezone = data.settings.calendarTimezone || "America/Sao_Paulo";
+  data.settings.calendarId = data.settings.calendarId || "";
+  data.settings.driveFolderUrl = data.settings.driveFolderUrl || "";
+  data.settings.driveFolderId = data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || "") || "";
+}
+function cloudConfigured(){
+  return data.settings.syncMode === "sheets" && Boolean(data.settings.appsScriptUrl && data.settings.apiKey);
+}
+function cloudCalendarButton(type, id){
+  if(!cloudConfigured()) return "";
+  const attr = type === "day" ? "data-day-cloud-calendar" : type === "place" ? "data-place-cloud-calendar" : "data-res-cloud-calendar";
+  return `<button class="ghost tiny cloud-action" ${attr}="${escapeAttr(id)}">Criar na agenda</button>`;
+}
+function extractDriveFolderId(value=""){
+  const text = String(value || "");
+  const match = text.match(/folders\/([a-zA-Z0-9_-]+)/) || text.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : text.length > 20 && !text.includes("http") ? text : "";
+}
+function sanitizeDataForCloud(source){
+  const clone = structuredCloneSafe(source);
+  clone.documents = (clone.documents || []).map(doc => {
+    const d = { ...doc };
+    if(d.file){
+      d.file = { name: d.file.name, size: d.file.size, type: d.file.type, localOnly: !d.driveFileId };
+    }
+    return d;
+  });
+  clone.settings = { ...clone.settings };
+  delete clone.settings.apiKey;
+  return clone;
+}
+async function cloudRequest(action, payload={}){
+  ensureV6Defaults();
+  const url = (data.settings.appsScriptUrl || "").trim();
+  const token = (data.settings.apiKey || "").trim();
+  if(!url) throw new Error("Cole a URL /exec do Apps Script em Configurações.");
+  if(!token) throw new Error("Preencha a chave de edição em Configurações.");
+  const body = new URLSearchParams();
+  body.set("action", action);
+  body.set("token", token);
+  body.set("payload", JSON.stringify(payload || {}));
+  const res = await fetch(url, { method:"POST", body });
+  const text = await res.text();
+  let json;
+  try{ json = JSON.parse(text); }catch(err){ throw new Error("Resposta não era JSON. Verifique se a URL termina em /exec e se o Web App foi implantado corretamente."); }
+  if(!json.ok) throw new Error(json.error || "Erro desconhecido no Apps Script.");
+  return json;
+}
+async function testCloudConnection(){
+  try{
+    showToast("Testando conexão...");
+    const json = await cloudRequest("ping", { title:data.trip.title });
+    showToast(json.message || "Conexão OK");
+  }catch(err){ showToast(err.message); }
+}
+async function setupCloudSheets(){
+  try{
+    showToast("Criando/atualizando abas da planilha...");
+    const json = await cloudRequest("setup", { data:sanitizeDataForCloud(data) });
+    showToast(json.message || "Planilha preparada");
+  }catch(err){ showToast(err.message); }
+}
+async function saveCloudNow(silent=false){
+  if(!cloudConfigured()) { if(!silent) showToast("Ative Google Sheets nas configurações."); return; }
+  try{
+    if(!silent) showToast("Salvando na nuvem...");
+    const payload = { data:sanitizeDataForCloud(data), settings:{ calendarId:data.settings.calendarId || "", driveFolderId:data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || "") || "" } };
+    const json = await cloudRequest("saveAll", payload);
+    data.settings.lastSyncAt = new Date().toISOString();
+    saveData();
+    if(!silent) showToast(json.message || "Salvo no Google Sheets");
+    renderSettings();
+  }catch(err){ if(!silent) showToast(err.message); }
+}
+async function loadCloudNow(){
+  if(!cloudConfigured()) { showToast("Ative Google Sheets nas configurações."); return; }
+  if(!confirm("Carregar dados da nuvem e substituir os dados locais deste navegador?")) return;
+  try{
+    showToast("Carregando da nuvem...");
+    const json = await cloudRequest("getAll", {});
+    if(!json.data) throw new Error("Nenhum dado encontrado na nuvem ainda.");
+    const incoming = normalizeData(json.data);
+    // Preserva configurações locais de conexão, que não ficam no backup da nuvem.
+    incoming.settings = { ...incoming.settings, appsScriptUrl:data.settings.appsScriptUrl, apiKey:data.settings.apiKey, syncMode:data.settings.syncMode, autoSync:data.settings.autoSync, calendarId:data.settings.calendarId, driveFolderId:data.settings.driveFolderId, driveFolderUrl:data.settings.driveFolderUrl, lastSyncAt:new Date().toISOString() };
+    data = incoming;
+    saveData();
+    renderAll();
+    renderMapMarkers();
+    showToast("Dados carregados do Google Sheets");
+  }catch(err){ showToast(err.message); }
+}
+function scheduleCloudSave(){
+  if(!cloudConfigured() || !data.settings.autoSync) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => saveCloudNow(true), 1800);
+}
+function saveAndRender(message="Salvo"){
+  saveData();
+  renderAll();
+  if(map) renderMapMarkers();
+  showToast(message);
+  scheduleCloudSave();
+}
+async function createCloudCalendarEvent(event){
+  if(!cloudConfigured()) { showToast("Configure Apps Script + chave para criar evento direto na agenda."); return; }
+  try{
+    showToast("Criando evento na agenda compartilhada...");
+    const json = await cloudRequest("createCalendarEvent", { event, trip:data.trip, settings:{ calendarId:data.settings.calendarId || "", timezone:data.settings.calendarTimezone || "America/Sao_Paulo" } });
+    showToast(json.message || "Evento criado no Google Agenda");
+    if(json.calendarUrl) window.open(json.calendarUrl, "_blank", "noopener");
+  }catch(err){ showToast(err.message); }
+}
+async function uploadDocumentToDrive(id){
+  if(!cloudConfigured()) { showToast("Configure Apps Script para enviar ao Drive."); return; }
+  const doc = data.documents.find(d => d.id === id);
+  if(!doc || !doc.file || !doc.file.dataUrl){ showToast("Este documento não tem arquivo local para enviar."); return; }
+  try{
+    showToast("Enviando arquivo ao Google Drive...");
+    const base64 = String(doc.file.dataUrl).split(",")[1] || "";
+    const json = await cloudRequest("uploadFile", {
+      fileName: doc.file.name,
+      mimeType: doc.file.type || "application/octet-stream",
+      base64,
+      folderId: data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || ""),
+      documentId: doc.id
+    });
+    doc.driveFileId = json.fileId || "";
+    doc.link = json.fileUrl || doc.link || "";
+    doc.file = { name: doc.file.name, size: doc.file.size, type: doc.file.type, localOnly:false };
+    saveAndRender("Arquivo enviado ao Drive");
+  }catch(err){ showToast(err.message); }
+}
+function openSheetsSetupModal(){
+  openModal("Integração Google Sheets + Agenda", `<div class="settings-box full-helper">
+    <p>Esta versão já está pronta para salvar a viagem em uma planilha e criar eventos na agenda compartilhada usando Google Apps Script.</p>
+    <div class="code-block">1. Crie uma Planilha Google chamada Central de Viagem.
+2. Na planilha, abra Extensões → Apps Script.
+3. Copie o arquivo google-apps-script/Code.gs deste ZIP.
+4. No Code.gs, ajuste API_KEY e, se quiser, CALENDAR_ID.
+5. Clique em Executar → setupCentralViagem e autorize.
+6. Implantar → Nova implantação → App da Web.
+7. Executar como: você. Acesso: qualquer pessoa com o link.
+8. Copie a URL que termina em /exec e cole aqui em Configurações.
+9. Preencha a mesma chave API_KEY na Central.</div>
+    <p class="muted">Depois disso, use os botões: Testar conexão, Preparar planilha, Salvar na nuvem e Carregar da nuvem.</p>
+  </div>`, () => closeModal(), "Entendi");
+}
+function renderSettings(){
+  ensureV6Defaults();
+  const connected = cloudConfigured();
+  const last = data.settings.lastSyncAt ? new Date(data.settings.lastSyncAt).toLocaleString("pt-BR") : "Nunca";
+  byId("settingsPanel").innerHTML = `<div class="settings-grid">
+      <div class="settings-box sync-box">
+        <h3>Sincronização Google Sheets</h3>
+        <p class="muted">A tela continua no GitHub Pages, mas os dados podem ficar em uma Planilha Google para abrir no celular, notebook e com sua esposa.</p>
+        <label>Modo de sincronização
+          <select id="settingSyncMode">
+            <option value="local" ${data.settings.syncMode === "local" ? "selected" : ""}>Local neste navegador</option>
+            <option value="sheets" ${data.settings.syncMode === "sheets" ? "selected" : ""}>Google Sheets + Apps Script</option>
+          </select>
+        </label>
+        <label>URL do Apps Script Web App /exec
+          <input id="settingAppsScriptUrl" value="${escapeAttr(data.settings.appsScriptUrl || "")}" placeholder="https://script.google.com/macros/s/.../exec" />
+        </label>
+        <label>Chave de edição
+          <input id="settingApiKey" value="${escapeAttr(data.settings.apiKey || "")}" placeholder="A mesma API_KEY do Code.gs" />
+        </label>
+        <label class="checkbox-line"><input id="settingAutoSync" type="checkbox" ${data.settings.autoSync ? "checked" : ""} /> Salvar automaticamente na nuvem após edições</label>
+        <p class="muted"><strong>Status:</strong> ${connected ? "Pronto para sincronizar" : "Ainda local"} · <strong>Último sync:</strong> ${escapeHtml(last)}</p>
+        <div class="card-actions stack-actions">
+          <button class="secondary" onclick="openSheetsSetupModal()">Como configurar</button>
+          <button class="secondary" onclick="testCloudConnection()">Testar conexão</button>
+          <button class="secondary" onclick="setupCloudSheets()">Preparar planilha</button>
+          <button class="primary" onclick="saveCloudNow(false)">Salvar na nuvem</button>
+          <button class="secondary" onclick="loadCloudNow()">Carregar da nuvem</button>
+        </div>
+      </div>
+      <div class="settings-box calendar-box">
+        <h3>Calendário compartilhado</h3>
+        <p class="muted">A Central monta o roteiro. A agenda compartilhada recebe apenas eventos importantes com data/hora e lembrete.</p>
+        <label>Nome sugerido da agenda
+          <input id="settingGoogleCalendarName" value="${escapeAttr(data.settings.googleCalendarName || "")}" placeholder="Viagem Mendoza & Buenos Aires 2026" />
+        </label>
+        <label>ID da agenda compartilhada
+          <input id="settingCalendarId" value="${escapeAttr(data.settings.calendarId || "")}" placeholder="ex.: abc123@group.calendar.google.com" />
+        </label>
+        <label>Link da agenda compartilhada
+          <input id="settingGoogleCalendarUrl" value="${escapeAttr(data.settings.googleCalendarUrl || "")}" placeholder="Cole o link da agenda, se quiser" />
+        </label>
+        <label>Fuso horário
+          <input id="settingCalendarTimezone" value="${escapeAttr(data.settings.calendarTimezone || "America/Sao_Paulo")}" placeholder="America/Sao_Paulo" />
+        </label>
+        <div class="card-actions">
+          <button class="secondary" onclick="openCalendarSetupModal()">Como criar agenda</button>
+          ${data.settings.googleCalendarUrl ? `<a class="secondary" href="${escapeAttr(data.settings.googleCalendarUrl)}" target="_blank" rel="noopener">Abrir agenda</a>` : `<a class="secondary" href="https://calendar.google.com/calendar/u/0/r/settings/createcalendar" target="_blank" rel="noopener">Criar agenda no Google</a>`}
+        </div>
+      </div>
+      <div class="settings-box">
+        <h3>Google Drive para documentos</h3>
+        <p class="muted">Crie uma pasta da viagem no Drive, compartilhe com sua esposa e cole o link/ID aqui. Os arquivos anexados podem ser enviados para essa pasta.</p>
+        <label>Link ou ID da pasta do Drive
+          <input id="settingDriveFolderUrl" value="${escapeAttr(data.settings.driveFolderUrl || "")}" placeholder="https://drive.google.com/drive/folders/..." />
+        </label>
+        <label>ID detectado da pasta
+          <input id="settingDriveFolderId" value="${escapeAttr(data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || "") || "")}" placeholder="ID da pasta" />
+        </label>
+      </div>
+      <div class="settings-box">
+        <h3>Google Maps</h3>
+        <p class="muted">Cadastre os lugares na tela, cole o link compartilhado do Maps e informe latitude/longitude para aparecer no mapa interno.</p>
+        <div class="code-block">Fluxo:
+Google Maps → Compartilhar → Copiar link
+Central → Lugares → + Novo lugar → colar link
+Depois vincule Dia + Manhã/Tarde/Noite.</div>
+      </div>
+      <div class="settings-box">
+        <h3>Backup manual</h3>
+        <p class="muted">Mesmo com Google Sheets, mantenha backup JSON antes de grandes mudanças.</p>
+        <div class="card-actions">
+          <button class="secondary" onclick="exportJson()">Exportar JSON</button>
+          <label class="secondary file-label" for="importJson">Importar JSON</label>
+        </div>
+      </div>
+      <div class="settings-box">
+        <h3>Arquivos incluídos no ZIP</h3>
+        <div class="code-block">google-apps-script/Code.gs
+INSTRUCOES_GOOGLE_SHEETS_E_AGENDA.md
+index.html / style.css / app.js</div>
+      </div>
+    </div>`;
+}
+function saveSettingsFromPanel(){
+  ensureV6Defaults();
+  data.settings.syncMode = byId("settingSyncMode")?.value || "local";
+  data.settings.appsScriptUrl = byId("settingAppsScriptUrl")?.value.trim() || "";
+  data.settings.apiKey = byId("settingApiKey")?.value.trim() || "";
+  data.settings.autoSync = Boolean(byId("settingAutoSync")?.checked);
+  data.settings.driveFolderUrl = byId("settingDriveFolderUrl")?.value.trim() || "";
+  data.settings.driveFolderId = byId("settingDriveFolderId")?.value.trim() || extractDriveFolderId(data.settings.driveFolderUrl || "") || "";
+  data.settings.googleCalendarName = byId("settingGoogleCalendarName")?.value.trim() || "";
+  data.settings.googleCalendarUrl = byId("settingGoogleCalendarUrl")?.value.trim() || "";
+  data.settings.calendarTimezone = byId("settingCalendarTimezone")?.value.trim() || "America/Sao_Paulo";
+  data.settings.calendarId = byId("settingCalendarId")?.value.trim() || "";
+  saveAndRender("Configurações salvas");
+}
+function init(){
+  ensureV52Defaults();
+  ensureV6Defaults();
+  bindEvents();
+  renderAll();
+  initMap();
+  setTimeout(renderMapMarkers, 250);
+}

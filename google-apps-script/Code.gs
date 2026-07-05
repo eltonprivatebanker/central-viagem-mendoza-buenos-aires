@@ -1,7 +1,7 @@
 
 /**
  * Central de Viagem — Backend Google Sheets + Drive + Agenda
- * Versão v6.4 — JSONP/CORS fix
+ * Versão v7.3 — JSONP/CORS + upload automático no Drive
  *
  * Como usar:
  * 1) Crie uma Planilha Google chamada "Central de Viagem".
@@ -129,8 +129,33 @@ function uploadFile_(payload) {
   const bytes = Utilities.base64Decode(payload.base64);
   const blob = Utilities.newBlob(bytes, payload.mimeType || 'application/octet-stream', payload.fileName);
   const file = folder.createFile(blob);
+  const result = { ok: true, message: 'Arquivo enviado ao Google Drive', fileId: file.getId(), fileUrl: file.getUrl(), name: file.getName() };
+
+  // Atualiza automaticamente o documento dentro do backup JSON da viagem.
+  // Assim, mesmo quando o navegador envia por no-cors e não consegue ler a resposta,
+  // a Central consegue recuperar o link depois em "Carregar da nuvem".
+  try {
+    if (payload.documentId) {
+      const data = readJsonSnapshot_() || {};
+      data.documents = data.documents || [];
+      let doc = data.documents.find(function(d){ return d.id === payload.documentId; });
+      if (!doc) {
+        doc = payload.documentData || { id: payload.documentId, title: payload.fileName, category: 'Documento', status: 'Pendente', dayId: '', notes: '' };
+        data.documents.push(doc);
+      }
+      doc.driveFileId = file.getId();
+      doc.link = file.getUrl();
+      doc.uploadStatus = 'uploadedDrive';
+      doc.file = { name: file.getName(), size: bytes.length, type: payload.mimeType || 'application/octet-stream', localOnly: false };
+      writeJsonSnapshot_(data);
+      writeReadableTables_(data);
+    }
+  } catch (err) {
+    log_('uploadFile_snapshot_warning', err.message || String(err));
+  }
+
   log_('uploadFile', payload.fileName);
-  return { ok: true, message: 'Arquivo enviado ao Google Drive', fileId: file.getId(), fileUrl: file.getUrl(), name: file.getName() };
+  return result;
 }
 
 function setupSheetsOnly_() {

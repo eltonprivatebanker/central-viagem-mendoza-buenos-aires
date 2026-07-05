@@ -508,13 +508,13 @@ function renderDocuments(){
       </div>
       <p>${escapeHtml(doc.notes || "Sem observações.")}</p>
       <p class="muted"><strong>Dia:</strong> ${dayLabel(doc.dayId)}</p>
-      ${doc.file ? `<div class="file-chip"><span>📎 ${escapeHtml(doc.file.name)} · ${fileSize(doc.file.size)}</span><button class="ghost tiny" data-download-doc="${doc.id}">Baixar</button></div>` : ""}
-      ${doc.driveFileId ? `<p class="muted"><strong>Drive:</strong> arquivo enviado para a pasta configurada.</p>` : ""}
+      ${doc.file ? `<div class="file-chip"><span>📎 ${escapeHtml(doc.file.name)} · ${fileSize(doc.file.size)}</span>${doc.file.dataUrl ? `<button class="ghost tiny" data-download-doc="${doc.id}">Baixar local</button>` : ""}</div>` : ""}
+      ${doc.driveFileId ? `<p class="muted"><strong>Drive:</strong> arquivo salvo automaticamente na pasta configurada.</p>` : doc.uploadStatus === "pendingDrive" ? `<p class="muted"><strong>Drive:</strong> envio em processamento. Use “Carregar da nuvem” em alguns segundos se o link ainda não aparecer.</p>` : ""}
       <div class="card-actions">
         <button class="ghost tiny" data-edit-doc="${doc.id}">Editar / anexar</button>
-        ${doc.link ? `<a class="ghost tiny" href="${escapeAttr(doc.link)}" target="_blank" rel="noopener">Abrir link</a>` : ""}
-        ${doc.file && cloudConfigured() ? `<button class="ghost tiny" data-upload-drive="${doc.id}">Enviar ao Drive</button>` : ""}
-        ${doc.file ? `<button class="ghost tiny danger" data-remove-file="${doc.id}">Remover arquivo</button>` : ""}
+        ${doc.link ? `<a class="ghost tiny" href="${escapeAttr(doc.link)}" target="_blank" rel="noopener">Abrir no Drive/link</a>` : ""}
+        ${doc.file && doc.file.dataUrl && cloudConfigured() && !doc.driveFileId ? `<button class="ghost tiny" data-upload-drive="${doc.id}">Reenviar ao Drive</button>` : ""}
+        ${doc.file && doc.file.dataUrl ? `<button class="ghost tiny danger" data-remove-file="${doc.id}">Remover arquivo local</button>` : ""}
         <button class="ghost tiny danger" data-delete-doc="${doc.id}">Excluir</button>
       </div>
     </article>`).join("") || `<div class="empty-state">Nenhum documento cadastrado.</div>`;
@@ -887,28 +887,59 @@ function openReservationModal(res=null){
   });
 }
 function openDocumentModal(doc=null){
-  const d = doc || { id: uid(), title:"", category:"Documento", status:"Pendente", dayId:"", link:"", notes:"", file:null };
+  const d = doc || { id: uid(), title:"", category:"Documento", status:"Pendente", dayId:"", link:"", notes:"", file:null, driveFileId:"", uploadStatus:"" };
+  const cloudNote = cloudConfigured()
+    ? "Ao escolher um arquivo, a Central tentará enviar automaticamente para a pasta do Google Drive configurada."
+    : "Sem nuvem configurada, o arquivo fica salvo apenas neste navegador. Configure Google Sheets/Drive para salvar online.";
   openModal(doc ? "Editar documento / anexo" : "Novo documento / anexo", `<div class="form-grid">
+    <div class="full modal-helper success-soft"><strong>Envio automático para o Drive</strong><br>${escapeHtml(cloudNote)}</div>
     <div class="full">${input("title", "Título", d.title, "text", "required")}</div>
     ${selectInput("category", "Categoria", d.category, ["Documentos pessoais","Seguro","Hospedagem","Deslocamentos","Passeios","Orçamento","Comprovante","Outro"])}
     ${selectInput("status", "Status", d.status, ["Pendente","Concluído"])}
     ${selectInput("dayId", "Vincular ao dia", d.dayId, dayOptions(true))}
-    <div class="full">${input("link", "Link externo / Google Drive", d.link, "url")}</div>
-    <div class="full"><label>Enviar arquivo neste navegador<input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx" /></label>${d.file ? `<div class="file-chip"><span>Arquivo atual: ${escapeHtml(d.file.name)} · ${fileSize(d.file.size)}</span></div>` : ""}</div>
+    <div class="full">${input("link", "Link externo / Google Drive", d.link, "url", 'placeholder="Opcional. Se você enviar arquivo, eu preencho o link do Drive automaticamente."')}</div>
+    <div class="full"><label>Arquivo para anexar
+      <input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx" />
+    </label>
+    ${d.driveFileId ? `<div class="file-chip ok"><span>☁️ Já salvo no Google Drive</span>${d.link ? `<a class="ghost tiny" href="${escapeAttr(d.link)}" target="_blank" rel="noopener">Abrir</a>` : ""}</div>` : ""}
+    ${d.file ? `<div class="file-chip"><span>Arquivo atual: ${escapeHtml(d.file.name)} · ${fileSize(d.file.size)}</span></div>` : ""}
+    <p class="muted">Arquivos até 8 MB são enviados automaticamente ao Drive quando a nuvem está configurada.</p></div>
     <div class="full">${textarea("notes", "Observações", d.notes)}</div>
   </div>`, async (fd, form) => {
     const fileInput = form.querySelector('input[name="file"]');
     const file = fileInput?.files?.[0];
-    const payload = { id:d.id, title:fd.get("title").toString().trim(), category:fd.get("category").toString(), status:fd.get("status").toString(), dayId:fd.get("dayId").toString(), link:fd.get("link").toString().trim(), notes:fd.get("notes").toString().trim(), file:d.file || null };
+    const payload = {
+      id:d.id,
+      title:fd.get("title").toString().trim(),
+      category:fd.get("category").toString(),
+      status:fd.get("status").toString(),
+      dayId:fd.get("dayId").toString(),
+      link:fd.get("link").toString().trim(),
+      notes:fd.get("notes").toString().trim(),
+      file:d.file || null,
+      driveFileId:d.driveFileId || "",
+      uploadStatus:d.uploadStatus || ""
+    };
     if(file){
-      if(file.size > 3 * 1024 * 1024){
-        alert("Para esta versão local, envie arquivos de até 3 MB ou use link do Google Drive. Arquivos maiores podem estourar o limite do navegador.");
+      if(file.size > 8 * 1024 * 1024){
+        alert("Para manter a sincronização estável, envie arquivos de até 8 MB. Para arquivos maiores, suba manualmente no Drive e cole o link.");
         return;
       }
       payload.file = await readFileAsDataUrl(file);
+      payload.driveFileId = "";
+      payload.uploadStatus = cloudConfigured() ? "pendingDrive" : "localOnly";
     }
     if(doc) Object.assign(doc, payload); else data.documents.push(payload);
-    closeModal(); saveAndRender("Documento salvo");
+    const targetId = payload.id;
+    closeModal();
+    saveData();
+    renderAll();
+    showToast(file && cloudConfigured() ? "Documento salvo. Enviando arquivo ao Drive..." : "Documento salvo");
+    if(file && cloudConfigured()){
+      await uploadDocumentToDrive(targetId, { auto:true });
+    }else{
+      scheduleCloudSave();
+    }
   });
 }
 function readFileAsDataUrl(file){
@@ -1838,25 +1869,70 @@ async function createCloudCalendarEvent(event){
     if(json.calendarUrl) window.open(json.calendarUrl, "_blank", "noopener");
   }catch(err){ showToast(err.message); }
 }
-async function uploadDocumentToDrive(id){
+async function uploadDocumentToDrive(id, options={}){
   if(!cloudConfigured()) { showToast("Configure Apps Script para enviar ao Drive."); return; }
   const doc = data.documents.find(d => d.id === id);
   if(!doc || !doc.file || !doc.file.dataUrl){ showToast("Este documento não tem arquivo local para enviar."); return; }
   try{
-    showToast("Enviando arquivo ao Google Drive...");
+    if(!options.silent) showToast("Enviando arquivo ao Google Drive...");
     const base64 = String(doc.file.dataUrl).split(",")[1] || "";
-    const json = await cloudRequest("uploadFile", {
+    const payload = {
       fileName: doc.file.name,
       mimeType: doc.file.type || "application/octet-stream",
       base64,
       folderId: data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || ""),
-      documentId: doc.id
-    });
-    doc.driveFileId = json.fileId || "";
-    doc.link = json.fileUrl || doc.link || "";
-    doc.file = { name: doc.file.name, size: doc.file.size, type: doc.file.type, localOnly:false };
-    saveAndRender("Arquivo enviado ao Drive");
-  }catch(err){ showToast(err.message); }
+      documentId: doc.id,
+      documentData: {
+        id: doc.id,
+        title: doc.title,
+        category: doc.category,
+        status: doc.status,
+        dayId: doc.dayId,
+        link: doc.link || "",
+        notes: doc.notes || "",
+        file: { name: doc.file.name, size: doc.file.size, type: doc.file.type || "application/octet-stream" }
+      }
+    };
+    const json = await cloudRequest("uploadFile", payload);
+    if(json.fileId || json.fileUrl){
+      doc.driveFileId = json.fileId || "";
+      doc.link = json.fileUrl || doc.link || "";
+      doc.uploadStatus = "uploadedDrive";
+      doc.file = { name: doc.file.name, size: doc.file.size, type: doc.file.type, localOnly:false };
+      saveData();
+      renderAll();
+      showToast(json.message || "Arquivo enviado ao Google Drive");
+      await saveCloudNow(true);
+      return;
+    }
+    // Quando o navegador bloqueia a leitura da resposta por CORS, o envio ainda pode ter sido recebido pelo Apps Script via no-cors.
+    doc.uploadStatus = "pendingDrive";
+    saveData();
+    renderAll();
+    showToast("Arquivo enviado para processamento no Drive. Vou tentar atualizar o link em alguns segundos.");
+    setTimeout(() => refreshFromCloudSilently("drive-upload"), 4500);
+  }catch(err){
+    doc.uploadStatus = "uploadError";
+    saveData();
+    renderAll();
+    showToast(err.message);
+  }
+}
+async function refreshFromCloudSilently(reason=""){
+  if(!cloudConfigured()) return;
+  try{
+    const json = await cloudRequest("getAll", {});
+    if(!json.data) return;
+    const incoming = normalizeData(json.data);
+    incoming.settings = { ...incoming.settings, appsScriptUrl:data.settings.appsScriptUrl, apiKey:data.settings.apiKey, syncMode:data.settings.syncMode, autoSync:data.settings.autoSync, calendarId:data.settings.calendarId, driveFolderId:data.settings.driveFolderId, driveFolderUrl:data.settings.driveFolderUrl, lastSyncAt:new Date().toISOString() };
+    data = incoming;
+    saveData();
+    renderAll();
+    renderMapMarkers();
+    showToast("Dados atualizados da nuvem" + (reason ? ` · ${reason}` : ""));
+  }catch(err){
+    console.warn("Não foi possível atualizar da nuvem", reason, err);
+  }
 }
 function openSheetsSetupModal(){
   openModal("Integração Google Sheets + Agenda", `<div class="settings-box full-helper">

@@ -1,23 +1,30 @@
-# Central de Viagem — v7.2 UX profissional
+# Central de Viagem — v7.3 Upload automático para Drive
 
-Versão focada em deixar o planner mais leve, intuitivo e conectado entre roteiro, mapa e pendências.
+Versão focada em melhorar documentos/anexos.
 
 ## O que mudou
 
-- Cards superiores agora funcionam como atalhos clicáveis:
-  - Período abre edição da viagem;
-  - Lugares abre a aba Lugares;
-  - Pendências volta para o painel;
-  - Orçamento abre a aba Orçamento.
-- Card do dia ficou ainda mais limpo:
-  - apenas **Editar** e menu **⋮** aparecem no cabeçalho;
-  - ações secundárias ficam no menu;
-  - data duplicada removida.
-- Lugares no roteiro centralizam o mapa e destacam o local selecionado.
-- Alertas automáticos de fronteira/documentos nos dias de deslocamento relevante.
-- Botões destrutivos, como Excluir e Resetar local, ficaram menos agressivos visualmente.
-- Mantida a integração Google Sheets / Apps Script já validada.
+- Ao anexar um arquivo em **Documentos**, a Central tenta enviar automaticamente para a pasta do Google Drive configurada.
+- O link do Drive passa a ser preenchido automaticamente no documento, sem precisar colar manualmente.
+- Se o navegador bloquear a leitura da resposta por CORS, o Apps Script atualiza o backup da planilha e a Central tenta recuperar o link alguns segundos depois.
+- O botão manual virou **Reenviar ao Drive**, usado apenas se algum envio falhar.
+- A tela do documento explica quando o arquivo está local, em processamento ou salvo no Drive.
 
-## Como subir
+## Importante
 
-Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
+Para esta versão funcionar completamente, atualize também o Apps Script:
+
+1. Abra sua planilha.
+2. Vá em **Extensões → Apps Script**.
+3. Substitua o conteúdo de `Código.gs` pelo arquivo `google-apps-script/Code.gs` desta versão.
+4. Confirme a chave:
+
+```js
+const API_KEY = 'mendoza-2026-elton-familia';
+```
+
+5. Clique em **Salvar**.
+6. Vá em **Implantar → Gerenciar implantações → Editar**.
+7. Escolha **Nova versão** e clique em **Implantar**.
+
+A integração Google Sheets/Drive já configurada continua a mesma.

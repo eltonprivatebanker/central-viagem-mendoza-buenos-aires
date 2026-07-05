@@ -1,20 +1,19 @@
-# Central de Viagem — v7.7 Documentos minimalistas
+# Central de Viagem — v7.8 Documentos compactos
 
-Versão focada em deixar o cadastro de documentos/anexos mais leve e direto.
+Versão focada em deixar o modal de documentos/anexos caber melhor na tela do computador, sem precisar rolar para encontrar o botão de salvar.
 
 ## O que mudou
 
-- Modal de documento mais curto e menos poluído.
-- Botão de procurar arquivo aparece logo no início.
-- Nome do documento é sugerido automaticamente a partir do arquivo.
-- Categoria pode ser sugerida pelo nome do arquivo.
-- Destino da subpasta do Drive continua sendo exibido.
-- Link externo, observações e detalhes ficam em seção opcional.
-- Mantém upload automático para subpastas do Google Drive da v7.6.
+- Modal de documento mais baixo e compacto no desktop.
+- Bloco de upload reduzido, com botão de procurar arquivo visível logo no topo.
+- Status do arquivo e destino do Drive mais discretos.
+- Campos principais reorganizados para ocupar menos altura.
+- Botões de ação ficam visíveis sem precisar rolar em telas normais de notebook/desktop.
+- Mantém upload automático para subpastas do Google Drive da v7.6/v7.7.
 
 ## Apps Script
 
-Não há mudança obrigatória em relação à v7.6 se o seu `Code.gs` já está com upload em subpastas e `API_KEY` correta.
+Não há mudança obrigatória em relação à v7.6/v7.7 se o seu `Code.gs` já está com upload em subpastas e `API_KEY` correta.
 
 ## Como subir
 

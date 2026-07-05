@@ -2830,3 +2830,85 @@ function openExpenseModal(exp=null){
     closeModal(); saveAndRender("Despesa salva");
   });
 }
+
+
+/* ===== v7.1 — roteiro mais leve, menos botões no card do dia ===== */
+window.collapsedDayIdsV71 = window.collapsedDayIdsV71 || new Set();
+function periodSummaryV71(day, key, title, note){
+  const places = data.places.filter(p => p.dayId === day.id && p.period === key);
+  const periodReservations = data.reservations.filter(r => (r.dayId === day.id || r.date === day.date) && ((key === "morning" && (!r.time || String(r.time) < "12:00")) || (key === "afternoon" && String(r.time || "14:00") >= "12:00" && String(r.time || "14:00") < "18:00") || (key === "night" && String(r.time || "19:00") >= "18:00")));
+  const linked = [
+    ...places.slice(0,3).map(place => `<button class="mini-chip-v71" data-select-place="${place.id}" title="${escapeAttr(place.name)}"><span>📍</span><span>${escapeHtml(place.name)}</span></button>`),
+    ...periodReservations.slice(0,2).map(r => `<button class="mini-chip-v71 reservation" data-edit-reservation="${r.id}" title="${escapeAttr(r.title)}"><span>🎫</span><span>${escapeHtml(r.title)}</span></button>`)
+  ].join("");
+  return `<section class="period-v71">
+    <div class="period-title-v71"><strong>${title}</strong><button class="ghost tiny" data-add-place-to-day="${day.id}" data-period="${key}" title="Adicionar lugar neste período">+ Lugar</button></div>
+    ${note ? `<div class="period-note-v71">${escapeHtml(note)}</div>` : `<div class="period-note-v71 empty">Sem programação definida</div>`}
+    ${linked ? `<div class="period-linked-v71">${linked}</div>` : ""}
+  </section>`;
+}
+function renderItinerary(){
+  const sorted = sortedDays();
+  byId("itineraryList").classList.add("itinerary-list-v71");
+  byId("itineraryList").innerHTML = sorted.map((day, idx) => {
+    const meta = dayMetaV70(day, idx);
+    const dayPlaces = data.places.filter(p => p.dayId === day.id);
+    const dayReservations = data.reservations.filter(r => r.dayId === day.id || (r.date && r.date === day.date));
+    const collapsed = window.collapsedDayIdsV71.has(day.id);
+    const statusText = `${dayPlaces.length} lugar(es) · ${dayReservations.length} reserva(s)`;
+    const dateText = meta.weekday && meta.weekday !== "sem data" ? meta.weekday : (meta.date || "Sem data");
+    return `<article class="itinerary-day itinerary-day-v71 ${collapsed ? "is-collapsed" : ""}" data-day-card="${day.id}">
+      <div class="day-head-v71">
+        <div class="day-identity-v71">
+          <span class="day-badge-v71">Dia<br>${String(idx + 1).padStart(2,"0")}</span>
+          <div class="day-title-v71">
+            <strong>${escapeHtml(meta.title)}</strong>
+            <small><span>📅 ${escapeHtml(dateText)}</span><span>📍 ${escapeHtml(meta.city)}</span><span>• ${escapeHtml(statusText)}</span></small>
+          </div>
+        </div>
+        <div class="day-actions-v71">
+          <button class="secondary tiny" data-toggle-day="${day.id}">${collapsed ? "Abrir" : "Recolher"}</button>
+          <button class="secondary tiny" data-edit-day="${day.id}">Editar</button>
+          <details class="day-more-v71"><summary>Mais</summary><div class="day-more-menu-v71">
+            <button class="ghost tiny" data-add-place-to-day="${day.id}" data-period="free">+ Lugar sem período</button>
+            <button class="ghost tiny" data-day-calendar="${day.id}">Abrir no Google Agenda</button>
+            ${cloudCalendarButton("day", day.id)}
+            <button class="ghost tiny" data-day-ics="${day.id}">Baixar .ics</button>
+            <button class="ghost tiny" data-move-day="${day.id}" data-dir="up" ${idx===0?"disabled":""}>Mover para cima</button>
+            <button class="ghost tiny" data-move-day="${day.id}" data-dir="down" ${idx===sorted.length-1?"disabled":""}>Mover para baixo</button>
+            <button class="ghost tiny" data-duplicate-day="${day.id}">Duplicar dia</button>
+            <button class="ghost tiny danger" data-delete-day="${day.id}">Excluir dia</button>
+          </div></details>
+        </div>
+      </div>
+      <div class="day-body-v71">
+        <div class="day-periods-v71">
+          ${periodSummaryV71(day, "morning", "☀️ Manhã", day.morning)}
+          ${periodSummaryV71(day, "afternoon", "🌤️ Tarde", day.afternoon)}
+          ${periodSummaryV71(day, "night", "🌙 Noite", day.night)}
+        </div>
+        ${(day.lodging || day.transport || day.notes || dayReservations.length) ? `<div class="day-footer-lite-v71">
+          ${day.lodging ? `<span>🏨 ${escapeHtml(day.lodging)}</span>` : ""}
+          ${day.transport ? `<span>🚗 ${escapeHtml(day.transport)}</span>` : ""}
+          ${day.notes ? `<span>📝 ${escapeHtml(day.notes)}</span>` : ""}
+          ${dayReservations.length ? `<span>🎫 ${dayReservations.length} reserva(s) do dia</span>` : ""}
+        </div>` : ""}
+      </div>
+    </article>`;
+  }).join("") || `<div class="empty-state">Nenhum dia cadastrado. Clique em + Novo dia.</div>`;
+  document.querySelectorAll("[data-toggle-day]").forEach(el => el.onclick = () => {
+    const id = el.dataset.toggleDay;
+    if(window.collapsedDayIdsV71.has(id)) window.collapsedDayIdsV71.delete(id); else window.collapsedDayIdsV71.add(id);
+    renderItinerary();
+  });
+  document.querySelectorAll("[data-edit-day]").forEach(el => el.onclick = () => openDayModal(data.days.find(d => d.id === el.dataset.editDay)));
+  document.querySelectorAll("[data-delete-day]").forEach(el => el.onclick = () => deleteDay(el.dataset.deleteDay));
+  document.querySelectorAll("[data-duplicate-day]").forEach(el => el.onclick = () => duplicateDay(el.dataset.duplicateDay));
+  document.querySelectorAll("[data-move-day]").forEach(el => el.onclick = () => moveDay(el.dataset.moveDay, el.dataset.dir));
+  document.querySelectorAll("[data-add-place-to-day]").forEach(el => openPlaceBtnBindV70(el));
+  document.querySelectorAll("[data-select-place]").forEach(el => el.onclick = () => selectPlace(el.dataset.selectPlace));
+  document.querySelectorAll("[data-edit-reservation]").forEach(el => el.onclick = () => openReservationModal(data.reservations.find(r => r.id === el.dataset.editReservation)));
+  document.querySelectorAll("[data-day-calendar]").forEach(el => el.onclick = () => openGoogleCalendarForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayCalendar))));
+  document.querySelectorAll("[data-day-ics]").forEach(el => el.onclick = () => downloadIcsForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayIcs)), `dia-${el.dataset.dayIcs}.ics`));
+  document.querySelectorAll("[data-day-cloud-calendar]").forEach(el => el.onclick = () => createCloudCalendarEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayCloudCalendar))));
+}

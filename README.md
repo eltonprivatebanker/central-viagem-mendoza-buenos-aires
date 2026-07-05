@@ -1,19 +1,20 @@
-# Central de Viagem — v7.0 Agenda fluida
+# Central de Viagem — v7.1 Roteiro mais leve
 
-Versão focada em fluidez no desktop e nos cadastros da viagem.
+Versão focada em reduzir a poluição visual dos cards do dia e deixar o roteiro mais fácil de bater o olho.
 
 ## O que mudou
 
-- Campos de data agora usam seletor de calendário (`type=date`).
-- Edição de dados da viagem com início e fim separados.
-- Modal de dia simplificado: data, cidade/etapa, título e manhã/tarde/noite em destaque.
-- Campos avançados de dia ficam recolhidos.
-- Itinerário mais legível para bater o olho: dia, data, cidade, lugares e reservas.
-- Botão principal “Editar dia” mais claro.
-- Botões técnicos de mover, duplicar e excluir foram para “Mais”.
-- Reservas e despesas também usam seletor de data.
-- Mantém integração Google Sheets / Apps Script já validada.
+- Card do dia mais compacto.
+- Remoção de botões excessivos da área principal.
+- Botões secundários agrupados no menu **Mais**.
+- Remoção da data duplicada no cabeçalho do dia.
+- Manhã, tarde e noite com visual mais leve.
+- Botão **+ Lugar** menor em cada período.
+- Reservas e observações do dia aparecem em chips compactos.
+- Possibilidade de recolher/abrir cada dia.
+- Mantidos campos de data com calendário da v7.0.
+- Integração Google Sheets/Apps Script mantida.
 
-## Como subir
+## Subida no GitHub
 
-Envie os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5.
+Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.

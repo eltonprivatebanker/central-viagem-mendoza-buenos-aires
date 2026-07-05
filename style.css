@@ -526,3 +526,77 @@ a{color:var(--gold-2);text-decoration:none}.app-shell{display:grid;grid-template
   .day-head-v70{align-items:flex-start;flex-direction:column;}
   .day-actions-v70{justify-content:flex-start;}
 }
+
+
+/* ===== v7.1 — roteiro mais leve e fluido ===== */
+.itinerary-list-v71{gap:12px;}
+.itinerary-day-v71{
+  background:rgba(13,26,45,.72);
+  border-radius:20px;
+  overflow:visible;
+}
+.itinerary-day-v71.is-collapsed .day-body-v71,
+.itinerary-day-v71.is-collapsed .day-footer-v71{display:none;}
+.day-head-v71{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:14px;
+  align-items:center;
+  padding:14px 16px;
+  background:rgba(255,255,255,.035);
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.day-identity-v71{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;min-width:0;}
+.day-badge-v71{
+  width:54px;height:42px;border-radius:15px;
+  display:grid;place-items:center;
+  background:rgba(243,197,108,.12);
+  border:1px solid rgba(243,197,108,.32);
+  color:var(--gold-2);font-weight:950;font-size:.82rem;line-height:1.05;text-align:center;
+}
+.day-title-v71{min-width:0;}
+.day-title-v71 strong{display:block;font-size:1.04rem;line-height:1.15;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.day-title-v71 small{display:flex;flex-wrap:wrap;gap:8px;color:#aebed8;margin-top:5px;font-weight:750;font-size:.82rem;}
+.day-title-v71 small span{display:inline-flex;align-items:center;gap:4px;}
+.day-actions-v71{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;}
+.day-actions-v71 .secondary,.day-actions-v71 .ghost{padding:8px 12px;font-size:.8rem;}
+.day-more-v71{position:relative;}
+.day-more-v71 summary{list-style:none;border:1px solid var(--border);border-radius:999px;padding:8px 12px;background:rgba(255,255,255,.04);font-size:.8rem;font-weight:950;color:#cfe0ff;cursor:pointer;}
+.day-more-v71 summary::-webkit-details-marker{display:none;}
+.day-more-menu-v71{position:absolute;right:0;top:38px;z-index:10;display:grid;gap:6px;min-width:178px;padding:8px;border:1px solid var(--border);border-radius:14px;background:#0b1628;box-shadow:var(--shadow);}
+.day-more-menu-v71 button{width:100%;justify-content:flex-start;text-align:left;}
+.day-body-v71{padding:14px 16px 15px;}
+.day-periods-v71{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.period-v71{
+  border:1px solid rgba(255,255,255,.075);
+  border-radius:16px;
+  background:rgba(255,255,255,.025);
+  padding:12px;
+  min-height:118px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.period-title-v71{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.period-title-v71 strong{color:var(--gold-2);font-size:.96rem;}
+.period-title-v71 .ghost{padding:4px 8px;font-size:.76rem;opacity:.78;}
+.period-note-v71{color:#dce7fb;line-height:1.38;font-size:.94rem;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
+.period-note-v71.empty{color:var(--muted);font-style:italic;border:1px dashed rgba(255,255,255,.11);border-radius:12px;padding:9px;-webkit-line-clamp:2;}
+.period-linked-v71{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto;}
+.mini-chip-v71{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(243,197,108,.24);background:rgba(243,197,108,.08);border-radius:999px;padding:6px 8px;color:var(--text);font-weight:850;font-size:.78rem;max-width:100%;}
+.mini-chip-v71 span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mini-chip-v71.reservation{border-color:rgba(141,184,255,.25);background:rgba(141,184,255,.08);}
+.day-footer-lite-v71{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+.day-footer-lite-v71 span{border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:6px 10px;color:#cbd6ea;font-size:.78rem;font-weight:850;background:rgba(255,255,255,.03);}
+.itinerary-tip-v71{font-size:.94rem;}
+@media (min-width:1181px){
+  .itinerary-day-v71{border-radius:18px;}
+  .day-body-v71{padding-top:12px;}
+  .period-v71{min-height:110px;}
+}
+@media (max-width:900px){
+  .day-head-v71{grid-template-columns:1fr;align-items:start;}
+  .day-actions-v71{justify-content:flex-start;}
+  .day-periods-v71{grid-template-columns:1fr;}
+  .day-title-v71 strong{white-space:normal;}
+}

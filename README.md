@@ -1,42 +1,35 @@
-# Central de Viagem — v6.4 CORS/JSONP
+# Central de Viagem — v6.5 Fluidez + Cidades pré-validadas
 
-Versão focada em corrigir o erro de conexão:
-
-`NetworkError when attempting to fetch resource.`
+Versão para testar melhorias de uso depois da integração com Google Sheets funcionar.
 
 ## O que mudou
 
-- O teste de conexão com Apps Script passou a usar JSONP, evitando bloqueio CORS no GitHub Pages.
-- O `google-apps-script/Code.gs` também foi atualizado para responder JSONP quando receber `callback`.
-- O campo de URL ficou mais tolerante: aceita link completo, código `AKfy...` ou trecho `/macros/s/AKfy...`.
-- A gravação continua usando Apps Script; se o navegador bloquear a leitura da resposta por CORS, a plataforma envia a solicitação e orienta conferir a planilha.
+- Cadastro de lugar ficou mais simples e fluido.
+- Campo de cidade virou lista pré-validada com:
+  - Cascavel — Brasil
+  - Foz do Iguaçu — Brasil
+  - Puerto Iguazú — Argentina
+  - Buenos Aires — Argentina
+  - Mendoza — Argentina
+  - Aconcágua / Alta Montanha — Argentina
+  - Potrerillos / Cacheuta — Argentina
+- O modal de lugar mostra primeiro só o essencial:
+  - nome do lugar;
+  - cidade/região;
+  - dia;
+  - período;
+  - link do Google Maps;
+  - observações.
+- Categoria, status, prioridade, horários e coordenadas foram movidos para "Avançado".
+- Adicionada lista de sugestões de lugares por cidade/região.
+- O mapa foi ajustado para reduzir piscadas/recarregamentos desnecessários.
+- Ordenação do itinerário agora prioriza a data, quando disponível.
 
-## Importante
+## Apps Script
 
-Depois de subir esta versão no GitHub, você também precisa atualizar o código no Apps Script:
+A pasta `google-apps-script` mantém o backend v6.4 compatível com JSONP/CORS.
+Se o seu Apps Script já está funcionando e mostra "Conexão OK com Apps Script", não precisa trocar o código agora.
 
-1. Abra o Apps Script.
-2. Substitua o conteúdo do `Código.gs` pelo arquivo `google-apps-script/Code.gs` desta versão.
-3. Troque `API_KEY` para a sua chave.
-4. Salve.
-5. Vá em `Implantar → Gerenciar implantações → Editar → Nova versão → Implantar`.
+## Subida no GitHub
 
-## Campos da plataforma
-
-URL do Apps Script:
-
-```text
-https://script.google.com/macros/s/SEU_CODIGO/exec
-```
-
-Chave de edição:
-
-```text
-A mesma API_KEY do Código.gs
-```
-
-Pasta do Drive:
-
-```text
-ID da pasta do Drive da viagem
-```
+Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.

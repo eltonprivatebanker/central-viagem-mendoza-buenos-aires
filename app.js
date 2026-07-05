@@ -1,4 +1,4 @@
-/* Central de Viagem v6 — edição na tela + integração opcional Google Sheets, Drive e Agenda
+/* Central de Viagem v6.5 — cadastro fluido, cidades pré-validadas e mapa estável
    GitHub Pages continua como interface. Google Apps Script pode virar backend gratuito. */
 const STORAGE_KEY = "centralViagemV5Completo"; // mantido para migrar dados locais da v5/v5.1
 const uid = () => `${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36).slice(-5)}`;
@@ -70,23 +70,49 @@ let mapResizeObserver = null;
 let mapResizeCycle = 0;
 const DEFAULT_MAP_CENTER = [-34.6037, -58.3816];
 
+const TRIP_CITIES = [
+  { name:"Cascavel", country:"Brasil", region:"Base/saída", lat:-24.9555, lng:-53.4552 },
+  { name:"Foz do Iguaçu", country:"Brasil", region:"Base/fronteira", lat:-25.5163, lng:-54.5854 },
+  { name:"Puerto Iguazú", country:"Argentina", region:"Fronteira", lat:-25.5986, lng:-54.5736 },
+  { name:"Buenos Aires", country:"Argentina", region:"Cidade principal", lat:-34.6037, lng:-58.3816 },
+  { name:"Mendoza", country:"Argentina", region:"Cidade principal", lat:-32.8895, lng:-68.8458 },
+  { name:"Aconcágua / Alta Montanha", country:"Argentina", region:"Passeio de montanha", lat:-32.8244, lng:-69.9425 },
+  { name:"Potrerillos / Cacheuta", country:"Argentina", region:"Passeio próximo a Mendoza", lat:-32.9758, lng:-69.1288 }
+];
+
+const PLACE_SUGGESTIONS = [
+  { name:"Cataratas do Iguaçu - lado Brasil", city:"Foz do Iguaçu", category:"Passeio", priority:"Alta", lat:-25.6953, lng:-54.4367, url:"https://www.google.com/maps/search/Cataratas+do+Igua%C3%A7u+lado+Brasil", notes:"Passeio clássico. Validar ingresso, horário e deslocamento." },
+  { name:"Parque das Aves", city:"Foz do Iguaçu", category:"Passeio", priority:"Média", lat:-25.6138, lng:-54.4821, url:"https://www.google.com/maps/search/Parque+das+Aves+Foz+do+Igua%C3%A7u", notes:"Boa opção familiar próxima às Cataratas." },
+  { name:"Marco das Três Fronteiras", city:"Foz do Iguaçu", category:"Passeio", priority:"Média", lat:-25.5884, lng:-54.5932, url:"https://www.google.com/maps/search/Marco+das+Tr%C3%AAs+Fronteiras+Foz+do+Igua%C3%A7u", notes:"Bom para fim de tarde/noite, se fizer sentido no roteiro." },
+  { name:"Cataratas do Iguazú - lado argentino", city:"Puerto Iguazú", category:"Passeio", priority:"Alta", lat:-25.6953, lng:-54.4367, url:"https://www.google.com/maps/search/Cataratas+do+Iguaz%C3%BA+Argentina", notes:"Validar ingressos, trilhas, tempo total e fronteira." },
+  { name:"Feirinha de Puerto Iguazú", city:"Puerto Iguazú", category:"Gastronomia", priority:"Baixa", lat:-25.5964, lng:-54.5742, url:"https://www.google.com/maps/search/Feirinha+Puerto+Iguaz%C3%BA", notes:"Opção leve para compras/comida." },
+  { name:"Puerto Madero", city:"Buenos Aires", category:"Passeio", priority:"Alta", lat:-34.6118, lng:-58.3638, url:"https://www.google.com/maps/search/Puerto+Madero+Buenos+Aires", notes:"Caminhada leve, fotos e restaurantes." },
+  { name:"Recoleta", city:"Buenos Aires", category:"Bairro", priority:"Alta", lat:-34.5875, lng:-58.3974, url:"https://www.google.com/maps/search/Recoleta+Buenos+Aires", notes:"Região clássica para passeio, cafés e pontos culturais." },
+  { name:"Palermo", city:"Buenos Aires", category:"Bairro/parque", priority:"Alta", lat:-34.5795, lng:-58.4309, url:"https://www.google.com/maps/search/Palermo+Buenos+Aires", notes:"Parques, cafés e pausa para criança." },
+  { name:"Jardim Japonês", city:"Buenos Aires", category:"Parque", priority:"Média", lat:-34.5751, lng:-58.4087, url:"https://www.google.com/maps/search/Jard%C3%ADn+Japon%C3%A9s+Buenos+Aires", notes:"Passeio visual e tranquilo." },
+  { name:"Teatro Colón", city:"Buenos Aires", category:"Cultura", priority:"Média", lat:-34.6011, lng:-58.3831, url:"https://www.google.com/maps/search/Teatro+Col%C3%B3n+Buenos+Aires", notes:"Validar visita guiada e horários." },
+  { name:"Parque General San Martín", city:"Mendoza", category:"Parque", priority:"Média", lat:-32.8892, lng:-68.8745, url:"https://www.google.com/maps/search/Parque+General+San+Mart%C3%ADn+Mendoza", notes:"Boa opção visual e leve para família." },
+  { name:"Cerro de la Gloria", city:"Mendoza", category:"Mirante", priority:"Média", lat:-32.8894, lng:-68.8792, url:"https://www.google.com/maps/search/Cerro+de+la+Gloria+Mendoza", notes:"Combina com Parque General San Martín." },
+  { name:"Plaza Independencia", city:"Mendoza", category:"Praça", priority:"Baixa", lat:-32.8895, lng:-68.8458, url:"https://www.google.com/maps/search/Plaza+Independencia+Mendoza", notes:"Ponto central para caminhada leve." },
+  { name:"Potrerillos", city:"Potrerillos / Cacheuta", category:"Paisagem", priority:"Alta", lat:-32.9758, lng:-69.1288, url:"https://www.google.com/maps/search/Potrerillos+Mendoza", notes:"Passeio de paisagem. Validar clima e estrada." },
+  { name:"Cacheuta", city:"Potrerillos / Cacheuta", category:"Passeio", priority:"Média", lat:-33.0175, lng:-69.0607, url:"https://www.google.com/maps/search/Cacheuta+Mendoza", notes:"Validar termas, horário e deslocamento." },
+  { name:"Parque Provincial Aconcágua", city:"Aconcágua / Alta Montanha", category:"Montanha", priority:"Alta", lat:-32.8244, lng:-69.9425, url:"https://www.google.com/maps/search/Parque+Provincial+Aconcagua", notes:"Validar clima, altitude, estrada e viabilidade com criança." },
+  { name:"Uspallata", city:"Aconcágua / Alta Montanha", category:"Parada", priority:"Média", lat:-32.5933, lng:-69.3483, url:"https://www.google.com/maps/search/Uspallata+Mendoza", notes:"Possível parada no caminho de Alta Montanha." },
+  { name:"Cristo Redentor de los Andes", city:"Aconcágua / Alta Montanha", category:"Montanha", priority:"Baixa", lat:-32.8247, lng:-70.0708, url:"https://www.google.com/maps/search/Cristo+Redentor+de+los+Andes", notes:"Depende muito de clima, estrada e logística." }
+];
+
+let mapRefreshTimer = null;
+let lastMarkerSignature = "";
+let mapHasFittedOnce = false;
+
 function forceMapRefresh(reason = ""){
   if(!map) return;
-  const mapEl = byId("map");
-  if(!mapEl) return;
-  mapResizeCycle += 1;
-  const cycle = mapResizeCycle;
-  mapEl.classList.add("force-map-reflow");
-  [30, 120, 280, 650, 1100].forEach(delay => {
-    setTimeout(() => {
-      if(cycle !== mapResizeCycle && delay > 280) return;
-      try{
-        map.invalidateSize({ pan:false });
-        if(mapTileLayer && typeof mapTileLayer.redraw === "function" && delay >= 280) mapTileLayer.redraw();
-      }catch(err){ console.warn("Falha ao recalcular mapa", reason, err); }
-      if(delay >= 650) mapEl.classList.remove("force-map-reflow");
-    }, delay);
-  });
+  clearTimeout(mapRefreshTimer);
+  mapRefreshTimer = setTimeout(() => {
+    try{
+      map.invalidateSize({ pan:false, debounceMoveend:true });
+    }catch(err){ console.warn("Falha ao recalcular mapa", reason, err); }
+  }, 180);
 }
 
 function reloadMapTiles(showMessage = true){
@@ -167,12 +193,38 @@ function dayLabel(dayId){
 }
 function uniqueCities(){
   const values = [
+    ...TRIP_CITIES.map(c => c.name),
     ...data.days.map(d => d.city),
     ...data.places.map(p => p.city),
     ...data.reservations.map(r => r.city),
     ...data.expenses.map(e => e.city)
   ].filter(Boolean).filter(c => c !== "Deslocamento");
   return [...new Set(values)].sort((a,b) => a.localeCompare(b,"pt-BR"));
+}
+function dateSortValue(day){
+  const p = parseDateParts ? parseDateParts(day.date) : null;
+  if(p) return `${String(p.y).padStart(4,"0")}${String(p.m).padStart(2,"0")}${String(p.d).padStart(2,"0")}`;
+  return `99999999-${String(day.number || 0).padStart(4,"0")}`;
+}
+function sortedDays(){
+  return data.days.slice().sort((a,b) => {
+    const da = dateSortValue(a), db = dateSortValue(b);
+    if(da !== db) return da.localeCompare(db);
+    return Number(a.number || 0) - Number(b.number || 0);
+  });
+}
+function cityOptions(selected=""){
+  const opts = uniqueCities().map(city => ({ value:city, label:city }));
+  if(selected && !opts.some(o => o.value === selected)) opts.unshift({ value:selected, label:selected });
+  return opts;
+}
+function suggestionsForCity(city){
+  if(!city) return PLACE_SUGGESTIONS;
+  return PLACE_SUGGESTIONS.filter(p => p.city === city);
+}
+function findPlaceSuggestion(name){
+  const n = String(name || "").trim().toLowerCase();
+  return PLACE_SUGGESTIONS.find(p => p.name.toLowerCase() === n);
 }
 function findDayByDate(date){ return data.days.find(d => d.date && d.date === date); }
 function nextDayNumber(){ return Math.max(0, ...data.days.map(d => Number(d.number || 0))) + 1; }
@@ -266,8 +318,7 @@ function renderMetrics(){
   byId("metricPaid").textContent = `${formatCurrency(paid)} pago`;
 }
 function renderSidebarDays(){
-  byId("sidebarDays").innerHTML = data.days
-    .slice().sort((a,b) => Number(a.number) - Number(b.number))
+  byId("sidebarDays").innerHTML = sortedDays()
     .map(day => `<button class="sidebar-day" data-jump-day="${day.id}"><span>Dia ${String(day.number).padStart(2,"0")}</span><small>${escapeHtml(day.date)}</small></button>`).join("");
   document.querySelectorAll("[data-jump-day]").forEach(btn => btn.onclick = () => {
     setView("itinerary");
@@ -277,7 +328,7 @@ function renderSidebarDays(){
 function renderOverview(){
   const done = data.tasks.filter(t => t.done).length;
   const pct = data.tasks.length ? Math.round(done / data.tasks.length * 100) : 0;
-  const nextDay = data.days.slice().sort((a,b)=>Number(a.number)-Number(b.number))[0];
+  const nextDay = sortedDays()[0];
   const cityRows = uniqueCities().map(city => ({
     city,
     places: data.places.filter(p => p.city === city).length,
@@ -327,7 +378,7 @@ function renderOverview(){
   document.querySelectorAll("[data-delete-task]").forEach(el => el.onclick = () => deleteItem("tasks", el.dataset.deleteTask, "Excluir pendência?"));
 }
 function renderItinerary(){
-  const sorted = data.days.slice().sort((a,b) => Number(a.number) - Number(b.number));
+  const sorted = sortedDays();
   byId("itineraryList").innerHTML = sorted.map((day, idx) => {
     const periodHtml = (key, title, note) => {
       const places = data.places.filter(p => p.dayId === day.id && p.period === key);
@@ -378,7 +429,7 @@ function renderFilters(){
   const cityValue = byId("filterCity").value || "all";
   const dayValue = byId("filterDay").value || "all";
   byId("filterCity").innerHTML = `<option value="all">Todas as cidades</option>` + uniqueCities().map(city => `<option value="${escapeAttr(city)}">${escapeHtml(city)}</option>`).join("");
-  byId("filterDay").innerHTML = `<option value="all">Todos os dias</option><option value="none">Sem dia definido</option>` + data.days.slice().sort((a,b)=>Number(a.number)-Number(b.number)).map(day => `<option value="${day.id}">Dia ${String(day.number).padStart(2,"0")} · ${escapeHtml(day.date)} · ${escapeHtml(day.title)}</option>`).join("");
+  byId("filterDay").innerHTML = `<option value="all">Todos os dias</option><option value="none">Sem dia definido</option>` + sortedDays().map(day => `<option value="${day.id}">Dia ${String(day.number).padStart(2,"0")} · ${escapeHtml(day.date)} · ${escapeHtml(day.title)}</option>`).join("");
   if([...byId("filterCity").options].some(o => o.value === cityValue)) byId("filterCity").value = cityValue;
   if([...byId("filterDay").options].some(o => o.value === dayValue)) byId("filterDay").value = dayValue;
 }
@@ -585,7 +636,6 @@ function initMap(){
       loadedOnce = true;
       mapEl.classList.remove("map-loading");
       if(fallback) fallback.hidden = true;
-      forceMapRefresh("tile-load");
     });
     mapTileLayer.on("tileerror", () => {
       // Não bloqueia o mapa por erro pontual de tile; apenas permite recarregar manualmente.
@@ -605,13 +655,11 @@ function initMap(){
       mapResizeObserver?.disconnect();
       mapResizeObserver = new ResizeObserver(() => forceMapRefresh("resize-observer"));
       mapResizeObserver.observe(mapEl);
-      document.querySelector(".map-panel") && mapResizeObserver.observe(document.querySelector(".map-panel"));
-      document.querySelector(".workspace") && mapResizeObserver.observe(document.querySelector(".workspace"));
     }
     window.addEventListener("resize", () => forceMapRefresh("window-resize"));
     document.addEventListener("visibilitychange", () => { if(!document.hidden) forceMapRefresh("visibility"); });
     setTimeout(() => { forceMapRefresh("init-delayed"); renderMapMarkers(); }, 250);
-    setTimeout(() => { forceMapRefresh("init-delayed-2"); fitMap(false); }, 900);
+    setTimeout(() => { fitMap(false); mapHasFittedOnce = true; }, 900);
   }catch(err){
     console.warn("Falha ao iniciar mapa", err);
     if(fallback) fallback.hidden = false;
@@ -619,6 +667,12 @@ function initMap(){
 }
 function renderMapMarkers(){
   if(!map || !markersLayer) return;
+  const signature = data.places.map(p => `${p.id}:${p.lat}:${p.lng}:${p.name}:${p.status}`).join("|");
+  if(signature === lastMarkerSignature){
+    renderSelectedPlaceBox();
+    return;
+  }
+  lastMarkerSignature = signature;
   markersLayer.clearLayers();
   const coords = [];
   data.places.forEach(place => {
@@ -629,16 +683,17 @@ function renderMapMarkers(){
     marker.on("click", () => selectPlace(place.id, false));
     coords.push([lat,lng]);
   });
-  if(!selectedPlaceId && coords.length) fitMap(false);
+  if(!mapHasFittedOnce && coords.length){
+    mapHasFittedOnce = true;
+    setTimeout(() => fitMap(false), 120);
+  }
   renderSelectedPlaceBox();
-  forceMapRefresh("markers-rendered");
 }
 window.selectPlaceFromPopup = function(id){ selectPlace(id, false); };
 function selectPlace(id, fly=true){
   selectedPlaceId = id;
   const place = data.places.find(p => p.id === id);
   if(place && map && fly){
-    forceMapRefresh("select-place");
     const lat = Number(place.lat), lng = Number(place.lng);
     if(Number.isFinite(lat) && Number.isFinite(lng)) map.flyTo([lat,lng], Math.max(map.getZoom(), 12), { duration:.7 });
   }
@@ -665,11 +720,10 @@ function fitMap(showMessage=true){
   if(!map || !markersLayer) return;
   const latlngs = data.places.map(p => [Number(p.lat), Number(p.lng)]).filter(([lat,lng]) => Number.isFinite(lat) && Number.isFinite(lng));
   if(!latlngs.length){ if(showMessage) showToast("Nenhum lugar com coordenadas"); return; }
-  forceMapRefresh("fit-before");
   setTimeout(() => {
     try{
       map.fitBounds(latlngs, { padding:[38,38], maxZoom:12 });
-      forceMapRefresh("fit-after");
+      mapHasFittedOnce = true;
     }catch(err){
       console.warn("Falha ao aproximar mapa", err);
     }
@@ -691,7 +745,7 @@ function selectInput(name, label, value, options){
 }
 function dayOptions(includeEmpty=true){
   const options = includeEmpty ? [{ value:"", label:"Sem dia definido" }] : [];
-  return options.concat(data.days.slice().sort((a,b)=>Number(a.number)-Number(b.number)).map(d => ({ value:d.id, label:`Dia ${String(d.number).padStart(2,"0")} · ${d.date} · ${d.title}` })));
+  return options.concat(sortedDays().map(d => ({ value:d.id, label:`Dia ${String(d.number).padStart(2,"0")} · ${d.date} · ${d.title}` })));
 }
 function openModal(title, bodyHtml, onSubmit, submitText="Salvar"){
   byId("modalTitle").textContent = title;
@@ -726,7 +780,7 @@ function openDayModal(day=null){
     ${input("number", "Número do dia", d.number, "number", 'min="1"')}
     ${input("date", "Data", d.date)}
     ${input("label", "Rótulo curto", d.label, "text", 'placeholder="Ex.: Seg 27/07"')}
-    ${input("city", "Cidade/etapa", d.city)}
+    ${selectInput("city", "Cidade/etapa", d.city, [{value:"Deslocamento",label:"Deslocamento"}, ...cityOptions(d.city)])}
     <div class="full">${input("title", "Título do dia", d.title)}</div>
     <div class="full">${textarea("morning", "Manhã", d.morning)}</div>
     <div class="full">${textarea("afternoon", "Tarde", d.afternoon)}</div>
@@ -1190,7 +1244,7 @@ function openCalendarSetupModal(){
 }
 
 function renderItinerary(){
-  const sorted = data.days.slice().sort((a,b) => Number(a.number) - Number(b.number));
+  const sorted = sortedDays();
   byId("itineraryList").innerHTML = sorted.map((day, idx) => {
     const periodHtml = (key, title, note) => {
       const places = data.places.filter(p => p.dayId === day.id && p.period === key);
@@ -1341,24 +1395,41 @@ function openTripModal(){
 }
 
 function openPlaceModal(place=null, preset={}){
-  const p = place || { id: uid(), name:"", city:"", category:"Passeio", status:"wishlist", priority:"Média", dayId:preset.dayId || "", period:preset.period || "free", lat:preset.lat || "", lng:preset.lng || "", url:"", location:"", startTime: defaultPeriodStart(preset.period), endTime: defaultPeriodEnd(preset.period), notes:"" };
-  openModal(place ? "Editar lugar" : "Adicionar lugar", `<div class="form-grid">
-    <div class="full">${input("name", "Nome do lugar", p.name, "text", "required")}</div>
-    ${input("city", "Cidade", p.city)}
-    ${input("category", "Categoria", p.category, "text", 'placeholder="Restaurante, parque, vinícola..."')}
-    ${selectInput("status", "Status", p.status, [{value:"wishlist",label:"Quero visitar"},{value:"planned",label:"No roteiro"},{value:"booked",label:"Reservado"},{value:"done",label:"Concluído"},{value:"discarded",label:"Descartado"}])}
-    ${selectInput("priority", "Prioridade", p.priority, ["Alta","Média","Baixa"])}
-    ${selectInput("dayId", "Vincular ao dia", p.dayId, dayOptions(true))}
+  const presetDay = data.days.find(d => d.id === preset.dayId);
+  const defaultCity = preset.city || presetDay?.city || data.trip.base?.split("/")[0]?.trim() || "Mendoza";
+  const p = place || { id: uid(), name:"", city:defaultCity, category:"Passeio", status:"wishlist", priority:"Média", dayId:preset.dayId || "", period:preset.period || "free", lat:preset.lat || "", lng:preset.lng || "", url:"", location:"", startTime: defaultPeriodStart(preset.period), endTime: defaultPeriodEnd(preset.period), notes:"" };
+  const citySelect = selectInput("city", "Cidade / região", p.city, cityOptions(p.city));
+  const suggestionOptions = PLACE_SUGGESTIONS.map(item => `<option value="${escapeAttr(item.name)}" data-city="${escapeAttr(item.city)}"></option>`).join("");
+  openModal(place ? "Editar lugar" : "Adicionar lugar", `<div class="form-grid place-modal-simple">
+    <div class="full modal-helper success-soft"><strong>Cadastro rápido</strong><br>Preencha só o essencial. Categoria, status, coordenadas e horários ficam em Avançado.</div>
+    <div class="full">
+      <label>Nome do lugar
+        <input name="name" list="placeSuggestionsList" value="${escapeAttr(p.name)}" required placeholder="Ex.: Parque General San Martín, Recoleta, vinícola...">
+        <datalist id="placeSuggestionsList">${suggestionOptions}</datalist>
+      </label>
+    </div>
+    ${citySelect}
+    ${selectInput("dayId", "Quando visitar", p.dayId, dayOptions(true))}
     ${selectInput("period", "Período", p.period, [{value:"free",label:"Sem período"},{value:"morning",label:"Manhã"},{value:"afternoon",label:"Tarde"},{value:"night",label:"Noite"}])}
-    ${input("startTime", "Início para agenda", p.startTime || defaultPeriodStart(p.period), "time")}
-    ${input("endTime", "Fim para agenda", p.endTime || defaultPeriodEnd(p.period), "time")}
-    <div class="full">${input("location", "Localização para Google Agenda", p.location || p.city || p.name)}</div>
-    ${input("lat", "Latitude", p.lat, "number", 'step="any" placeholder="-32.8895"')}
-    ${input("lng", "Longitude", p.lng, "number", 'step="any" placeholder="-68.8458"')}
-    <div class="full">${input("url", "Link Google Maps", p.url, "url", 'placeholder="https://maps.app.goo.gl/... ou URL completa do Maps"')}</div>
-    <div class="full"><button type="button" class="secondary" id="btnExtractCoords">Tentar preencher coordenadas pelo link</button></div>
-    <div class="full"><p class="muted">Link curto maps.app.goo.gl pode ser salvo e aberto normalmente, mas não revela latitude/longitude para desenhar o pino. Para o pino aparecer no mapa, preencha latitude/longitude ou cole uma URL completa do Google Maps que contenha @lat,lng.</p></div>
-    <div class="full">${textarea("notes", "Observações", p.notes)}</div>
+    <div class="full">${input("url", "Link do Google Maps", p.url, "url", 'placeholder="Cole o link compartilhado do Maps"')}</div>
+    <div class="full">${textarea("notes", "Observações", p.notes, 'placeholder="Por que vale ir, cuidados, reserva, melhor horário..."')}</div>
+    <div class="full">
+      <details class="advanced-box">
+        <summary>Avançado: categoria, status, agenda e coordenadas</summary>
+        <div class="form-grid advanced-grid">
+          ${selectInput("category", "Categoria", p.category || "Passeio", ["Passeio","Bairro","Parque","Mirante","Montanha","Gastronomia","Restaurante","Vinícola","Cultura","Hospedagem","Compras","Outro"])}
+          ${selectInput("status", "Status", p.status || "wishlist", [{value:"wishlist",label:"Quero visitar"},{value:"planned",label:"No roteiro"},{value:"booked",label:"Reservado"},{value:"done",label:"Concluído"},{value:"discarded",label:"Descartado"}])}
+          ${selectInput("priority", "Prioridade", p.priority || "Média", ["Alta","Média","Baixa"])}
+          ${input("startTime", "Início para agenda", p.startTime || defaultPeriodStart(p.period), "time")}
+          ${input("endTime", "Fim para agenda", p.endTime || defaultPeriodEnd(p.period), "time")}
+          <div class="full">${input("location", "Localização para Google Agenda", p.location || p.city || p.name)}</div>
+          ${input("lat", "Latitude", p.lat, "number", 'step="any" placeholder="-32.8895"')}
+          ${input("lng", "Longitude", p.lng, "number", 'step="any" placeholder="-68.8458"')}
+          <div class="full"><button type="button" class="secondary" id="btnExtractCoords">Tentar preencher coordenadas pelo link</button></div>
+          <div class="full"><p class="muted">Para o pino aparecer no mapa interno, use latitude/longitude. Link curto do Maps continua funcionando como link externo.</p></div>
+        </div>
+      </details>
+    </div>
   </div>`, fd => {
     const dayId = fd.get("dayId").toString();
     const status = fd.get("status").toString();
@@ -1366,14 +1437,14 @@ function openPlaceModal(place=null, preset={}){
       id: p.id,
       name: fd.get("name").toString().trim(),
       city: fd.get("city").toString().trim(),
-      category: fd.get("category").toString().trim(),
+      category: fd.get("category").toString().trim() || "Passeio",
       status: dayId && status === "wishlist" ? "planned" : status,
-      priority: fd.get("priority").toString(),
+      priority: fd.get("priority").toString() || "Média",
       dayId,
       period: fd.get("period").toString(),
-      startTime: fd.get("startTime").toString(),
-      endTime: fd.get("endTime").toString(),
-      location: fd.get("location").toString().trim(),
+      startTime: fd.get("startTime").toString() || defaultPeriodStart(fd.get("period").toString()),
+      endTime: fd.get("endTime").toString() || defaultPeriodEnd(fd.get("period").toString()),
+      location: fd.get("location").toString().trim() || `${fd.get("name").toString().trim()}, ${fd.get("city").toString().trim()}`,
       lat: fd.get("lat") === "" ? "" : Number(fd.get("lat")),
       lng: fd.get("lng") === "" ? "" : Number(fd.get("lng")),
       url: fd.get("url").toString().trim(),
@@ -1382,22 +1453,50 @@ function openPlaceModal(place=null, preset={}){
     if(place) Object.assign(place, payload); else data.places.push(payload);
     selectedPlaceId = payload.id;
     closeModal(); saveAndRender("Lugar salvo");
-  });
+  }, place ? "Salvar lugar" : "Salvar lugar");
+
   setTimeout(() => {
+    const form = byId("modalForm");
+    if(!form) return;
+    const nameInput = form.querySelector('[name="name"]');
+    const citySelect = form.querySelector('[name="city"]');
+    const categorySelect = form.querySelector('[name="category"]');
+    const prioritySelect = form.querySelector('[name="priority"]');
+    const urlInput = form.querySelector('[name="url"]');
+    const notesInput = form.querySelector('[name="notes"]');
+    const latInput = form.querySelector('[name="lat"]');
+    const lngInput = form.querySelector('[name="lng"]');
+    const locationInput = form.querySelector('[name="location"]');
+    function applySuggestion(){
+      const suggestion = findPlaceSuggestion(nameInput?.value);
+      if(!suggestion) return;
+      if(citySelect) citySelect.value = suggestion.city;
+      if(categorySelect) categorySelect.value = suggestion.category || "Passeio";
+      if(prioritySelect) prioritySelect.value = suggestion.priority || "Média";
+      if(urlInput && !urlInput.value) urlInput.value = suggestion.url || "";
+      if(notesInput && !notesInput.value) notesInput.value = suggestion.notes || "";
+      if(latInput && !latInput.value && suggestion.lat) latInput.value = suggestion.lat;
+      if(lngInput && !lngInput.value && suggestion.lng) lngInput.value = suggestion.lng;
+      if(locationInput && !locationInput.value) locationInput.value = `${suggestion.name}, ${suggestion.city}`;
+      showToast("Sugestão preenchida");
+    }
+    nameInput?.addEventListener("change", applySuggestion);
+    citySelect?.addEventListener("change", () => {
+      if(locationInput && nameInput?.value) locationInput.value = `${nameInput.value}, ${citySelect.value}`;
+    });
     const btn = byId("btnExtractCoords");
-    if(!btn) return;
-    btn.onclick = () => {
-      const form = byId("modalForm");
-      const urlInput = form.querySelector('[name="url"]');
-      const result = extractLatLngFromMapsUrl(urlInput?.value);
-      if(result){
-        form.querySelector('[name="lat"]').value = result.lat;
-        form.querySelector('[name="lng"]').value = result.lng;
-        showToast("Coordenadas preenchidas");
-      }else{
-        alert("Não encontrei latitude/longitude neste link. Link curto maps.app.goo.gl funciona como link externo, mas para criar pino no mapa é melhor colar uma URL completa com @latitude,longitude ou preencher as coordenadas manualmente.");
-      }
-    };
+    if(btn){
+      btn.onclick = () => {
+        const result = extractLatLngFromMapsUrl(urlInput?.value);
+        if(result){
+          latInput.value = result.lat;
+          lngInput.value = result.lng;
+          showToast("Coordenadas preenchidas");
+        }else{
+          alert("Não encontrei latitude/longitude neste link. O link curto do Maps pode ser salvo, mas para criar pino no mapa é melhor usar coordenadas ou URL completa com @latitude,longitude.");
+        }
+      };
+    }
   }, 80);
 }
 
@@ -1721,7 +1820,6 @@ function scheduleCloudSave(){
 function saveAndRender(message="Salvo"){
   saveData();
   renderAll();
-  if(map) renderMapMarkers();
   showToast(message);
   scheduleCloudSave();
 }

@@ -188,8 +188,11 @@ function periodLabel(period){
   return ({ morning:"Manhã", afternoon:"Tarde", night:"Noite", free:"Sem período" })[period] || "Sem período";
 }
 function dayLabel(dayId){
-  const d = data.days.find(x => x.id === dayId);
-  return d ? `Dia ${String(d.number).padStart(2,"0")} · ${d.date} · ${d.title}` : "Sem dia definido";
+  const sorted = sortedDays();
+  const d = sorted.find(x => x.id === dayId);
+  if(!d) return "Sem dia definido";
+  const idx = sorted.findIndex(x => x.id === dayId);
+  return `Dia ${String(idx + 1).padStart(2,"0")} · ${d.date} · ${d.title}`;
 }
 function uniqueCities(){
   const values = [
@@ -319,7 +322,10 @@ function renderMetrics(){
 }
 function renderSidebarDays(){
   byId("sidebarDays").innerHTML = sortedDays()
-    .map(day => `<button class="sidebar-day" data-jump-day="${day.id}"><span>Dia ${String(day.number).padStart(2,"0")}</span><small>${escapeHtml(day.date)}</small></button>`).join("");
+    .map((day, idx) => `<button class="sidebar-day sidebar-day-v66" data-jump-day="${day.id}">
+      <span>Dia ${String(idx + 1).padStart(2,"0")}</span>
+      <small><b>${escapeHtml(day.date || "—")}</b><em>${escapeHtml(day.city || day.title || "Etapa")}</em></small>
+    </button>`).join("");
   document.querySelectorAll("[data-jump-day]").forEach(btn => btn.onclick = () => {
     setView("itinerary");
     setTimeout(() => document.querySelector(`[data-day-card="${btn.dataset.jumpDay}"]`)?.scrollIntoView({ behavior:"smooth", block:"start" }), 100);
@@ -359,7 +365,7 @@ function renderOverview(){
       </div>
       <div class="overview-box">
         <h3>Resumo operacional</h3>
-        <p><strong>Próximo dia:</strong><br>${nextDay ? `Dia ${String(nextDay.number).padStart(2,"0")} · ${escapeHtml(nextDay.date)} · ${escapeHtml(nextDay.title)}` : "Nenhum dia cadastrado."}</p>
+        <p><strong>Próximo dia:</strong><br>${nextDay ? escapeHtml(dayLabel(nextDay.id)) : "Nenhum dia cadastrado."}</p>
         <p><strong>Pessoas:</strong><br>${escapeHtml(data.trip.people || "—")}</p>
         <div class="city-breakdown">
           ${cityRows.map(row => `
@@ -393,7 +399,7 @@ function renderItinerary(){
     return `<article class="itinerary-day" data-day-card="${day.id}">
       <div class="day-head">
         <div class="day-title">
-          <strong>Dia ${String(day.number).padStart(2,"0")} · ${escapeHtml(day.title)}</strong>
+          <strong>Dia ${String(idx + 1).padStart(2,"0")} · ${escapeHtml(day.title)}</strong>
           <small>${escapeHtml(day.label || "")} · ${escapeHtml(day.date || "")} · ${escapeHtml(day.city || "")}</small>
           ${(day.lodging || day.transport) ? `<small>🏨 ${escapeHtml(day.lodging || "—")} · 🚗 ${escapeHtml(day.transport || "—")}</small>` : ""}
         </div>
@@ -429,7 +435,7 @@ function renderFilters(){
   const cityValue = byId("filterCity").value || "all";
   const dayValue = byId("filterDay").value || "all";
   byId("filterCity").innerHTML = `<option value="all">Todas as cidades</option>` + uniqueCities().map(city => `<option value="${escapeAttr(city)}">${escapeHtml(city)}</option>`).join("");
-  byId("filterDay").innerHTML = `<option value="all">Todos os dias</option><option value="none">Sem dia definido</option>` + sortedDays().map(day => `<option value="${day.id}">Dia ${String(day.number).padStart(2,"0")} · ${escapeHtml(day.date)} · ${escapeHtml(day.title)}</option>`).join("");
+  byId("filterDay").innerHTML = `<option value="all">Todos os dias</option><option value="none">Sem dia definido</option>` + sortedDays().map((day, idx) => `<option value="${day.id}">Dia ${String(idx + 1).padStart(2,"0")} · ${escapeHtml(day.date)} · ${escapeHtml(day.title)}</option>`).join("");
   if([...byId("filterCity").options].some(o => o.value === cityValue)) byId("filterCity").value = cityValue;
   if([...byId("filterDay").options].some(o => o.value === dayValue)) byId("filterDay").value = dayValue;
 }
@@ -745,7 +751,7 @@ function selectInput(name, label, value, options){
 }
 function dayOptions(includeEmpty=true){
   const options = includeEmpty ? [{ value:"", label:"Sem dia definido" }] : [];
-  return options.concat(sortedDays().map(d => ({ value:d.id, label:`Dia ${String(d.number).padStart(2,"0")} · ${d.date} · ${d.title}` })));
+  return options.concat(sortedDays().map((d, idx) => ({ value:d.id, label:`Dia ${String(idx + 1).padStart(2,"0")} · ${d.date} · ${d.title}` })));
 }
 function openModal(title, bodyHtml, onSubmit, submitText="Salvar"){
   byId("modalTitle").textContent = title;
@@ -1161,7 +1167,7 @@ function dayCalendarEvent(day){
   const places = data.places.filter(p => p.dayId === day.id);
   const reservations = data.reservations.filter(r => r.dayId === day.id || r.date === day.date);
   return {
-    title: `Dia ${String(day.number).padStart(2,"0")} — ${day.title}`,
+    title: `${dayLabel(day.id)} — ${day.title}`,
     date: day.date,
     startTime: "",
     endTime: "",
@@ -1259,7 +1265,7 @@ function renderItinerary(){
     return `<article class="itinerary-day" data-day-card="${day.id}">
       <div class="day-head">
         <div class="day-title">
-          <strong>Dia ${String(day.number).padStart(2,"0")} · ${escapeHtml(day.title)}</strong>
+          <strong>Dia ${String(idx + 1).padStart(2,"0")} · ${escapeHtml(day.title)}</strong>
           <small>${escapeHtml(day.label || "")} · ${escapeHtml(day.date || "")} · ${escapeHtml(day.city || "")}</small>
           ${(day.lodging || day.transport) ? `<small>🏨 ${escapeHtml(day.lodging || "—")} · 🚗 ${escapeHtml(day.transport || "—")}</small>` : ""}
         </div>
@@ -1969,4 +1975,16 @@ function init(){
   renderAll();
   initMap();
   setTimeout(() => { renderMapMarkers(); forceMapRefresh("init-final"); }, 250);
+}
+
+
+/* ===== v6.6 — refinamento desktop, sidebar informativa e mapa menos piscante ===== */
+function forceMapRefresh(reason = ""){
+  if(!map) return;
+  clearTimeout(mapRefreshTimer);
+  mapRefreshTimer = setTimeout(() => {
+    try{
+      map.invalidateSize({ pan:false, debounceMoveend:true });
+    }catch(err){ console.warn("Falha ao recalcular mapa", reason, err); }
+  }, 420);
 }

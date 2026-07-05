@@ -1,35 +1,22 @@
-# Central de Viagem — v6.5 Fluidez + Cidades pré-validadas
+# Central de Viagem — v6.6 Refinamento Desktop
 
-Versão para testar melhorias de uso depois da integração com Google Sheets funcionar.
+Versão baseada na v6.5, mantendo a integração já validada com Google Sheets/Apps Script, mas com ajustes de layout para desktop.
 
 ## O que mudou
 
-- Cadastro de lugar ficou mais simples e fluido.
-- Campo de cidade virou lista pré-validada com:
-  - Cascavel — Brasil
-  - Foz do Iguaçu — Brasil
-  - Puerto Iguazú — Argentina
-  - Buenos Aires — Argentina
-  - Mendoza — Argentina
-  - Aconcágua / Alta Montanha — Argentina
-  - Potrerillos / Cacheuta — Argentina
-- O modal de lugar mostra primeiro só o essencial:
-  - nome do lugar;
-  - cidade/região;
-  - dia;
-  - período;
-  - link do Google Maps;
-  - observações.
-- Categoria, status, prioridade, horários e coordenadas foram movidos para "Avançado".
-- Adicionada lista de sugestões de lugares por cidade/região.
-- O mapa foi ajustado para reduzir piscadas/recarregamentos desnecessários.
-- Ordenação do itinerário agora prioriza a data, quando disponível.
+- Topo/hero mais compacto no computador.
+- Cards de resumo mais baixos e com cara de dashboard.
+- Sidebar mais estreita e mais enxuta.
+- Dias da viagem na sidebar agora mostram data e cidade/região.
+- Roteiro passa a exibir a numeração em ordem cronológica visual.
+- Mapa com área mais proporcional ao desktop.
+- Redução de espaçamentos verticais exagerados.
+- Mapa com recálculo menos agressivo para reduzir piscadas.
+- Mantida a tela de configurações simples da v6.3/v6.4.
+- Mantido o cadastro fluido de lugares da v6.5.
 
-## Apps Script
+## Importante
 
-A pasta `google-apps-script` mantém o backend v6.4 compatível com JSONP/CORS.
-Se o seu Apps Script já está funcionando e mostra "Conexão OK com Apps Script", não precisa trocar o código agora.
+Se a integração com Google Sheets já funcionou, não é necessário recriar a planilha nem refazer o Apps Script. Basta subir esta versão no GitHub substituindo os arquivos atuais.
 
-## Subida no GitHub
-
-Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
+Depois de publicar no GitHub Pages, use Ctrl+F5 no navegador para evitar cache antigo.

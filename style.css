@@ -143,3 +143,259 @@ a{color:var(--gold-2);text-decoration:none}.app-shell{display:grid;grid-template
 
 /* v6.5 — cadastro de lugares mais fluido */
 .modal-helper{border:1px solid var(--border);border-radius:18px;padding:12px 14px;background:rgba(255,255,255,.04);color:#cfe0ff;line-height:1.45}.success-soft{background:rgba(64,211,145,.10);border-color:rgba(64,211,145,.32);color:#d9ffec}.advanced-box{border:1px solid var(--border);border-radius:18px;background:rgba(255,255,255,.035);padding:0;overflow:hidden}.advanced-box summary{cursor:pointer;list-style:none;padding:13px 15px;font-weight:950;color:#ffd98d}.advanced-box summary::-webkit-details-marker{display:none}.advanced-box summary:after{content:"＋";float:right;color:#9fb2cf}.advanced-box[open] summary:after{content:"−"}.advanced-grid{padding:14px;border-top:1px solid var(--border)}.place-modal-simple label{gap:7px}.place-modal-simple input,.place-modal-simple select,.place-modal-simple textarea{min-height:46px}.place-modal-simple textarea{min-height:84px}.modal .form-grid.place-modal-simple{gap:13px}.map.map-stable,.map{contain:layout paint;backface-visibility:hidden}.map.force-map-reflow{transform:none}
+
+/* ===== v6.6 — refinamento desktop / dashboard mais compacto ===== */
+@media (min-width: 1181px){
+  .app-shell{
+    grid-template-columns:220px minmax(0,1fr);
+  }
+  .sidebar{
+    padding:16px 10px;
+    gap:13px;
+  }
+  .brand-block{
+    gap:10px;
+    padding:8px 6px 14px;
+  }
+  .brand-mark{
+    width:38px;
+    height:38px;
+    border-radius:14px;
+  }
+  .brand-block strong{font-size:.96rem;}
+  .brand-block span{font-size:.78rem;}
+  .nav-list{gap:6px;}
+  .nav-item{
+    border-radius:13px;
+    padding:10px 11px;
+    font-size:.92rem;
+  }
+  .sidebar-title{
+    margin:3px 5px 7px;
+    font-size:.69rem;
+  }
+  .sidebar-days{gap:5px;}
+  .sidebar-day{
+    min-height:46px;
+    padding:8px 9px;
+    border-radius:12px;
+  }
+  .sidebar-day.sidebar-day-v66{
+    align-items:center;
+  }
+  .sidebar-day.sidebar-day-v66 span{
+    min-width:48px;
+    font-size:.78rem;
+  }
+  .sidebar-day.sidebar-day-v66 small{
+    display:grid;
+    gap:1px;
+    text-align:right;
+    line-height:1.16;
+    min-width:0;
+  }
+  .sidebar-day.sidebar-day-v66 small b{
+    color:#dce7fb;
+    font-size:.75rem;
+    font-weight:900;
+  }
+  .sidebar-day.sidebar-day-v66 small em{
+    color:var(--muted);
+    font-size:.69rem;
+    font-style:normal;
+    max-width:110px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .sidebar-footer{gap:7px;}
+  .sidebar-footer .small{
+    padding:8px 10px;
+    font-size:.78rem;
+  }
+
+  .main-panel{
+    padding:18px 24px 32px;
+  }
+  .topbar{
+    align-items:center;
+    border-radius:24px;
+    padding:22px 26px;
+    margin-bottom:14px;
+  }
+  .topbar h1{
+    font-size:clamp(2.55rem,3.25vw,3.75rem);
+    line-height:1.01;
+    margin:10px 0 8px;
+    max-width:950px;
+  }
+  .topbar p{
+    font-size:.98rem;
+    max-width:760px;
+  }
+  .eyebrow,.pill{
+    font-size:.68rem;
+    padding:6px 9px;
+  }
+  .top-actions{
+    min-width:180px;
+    justify-content:flex-end;
+    align-self:flex-start;
+  }
+  .top-actions .primary,
+  .top-actions .secondary{
+    padding:10px 15px;
+    font-size:.9rem;
+  }
+  #btnEditTrip{
+    padding-inline:17px;
+  }
+
+  .dashboard-grid{
+    gap:12px;
+    margin-bottom:14px;
+  }
+  .metric-card{
+    border-radius:18px;
+    padding:14px 16px;
+    min-height:104px;
+  }
+  .metric-card span{font-size:.78rem;}
+  .metric-card strong{
+    font-size:1.55rem;
+    margin:5px 0 4px;
+  }
+  .metric-card small{font-size:.82rem;}
+
+  .workspace{
+    grid-template-columns:minmax(0,1fr) minmax(500px,.72fr);
+    gap:14px;
+  }
+  .view{
+    border-radius:24px;
+    padding:18px;
+  }
+  .section-head{
+    margin-bottom:14px;
+    gap:12px;
+  }
+  .section-head h2{
+    font-size:1.42rem;
+    margin-top:8px;
+  }
+  .primary,.secondary,.ghost{
+    padding:10px 15px;
+  }
+  .tiny{
+    padding:6px 9px;
+    font-size:.72rem;
+  }
+
+  .overview-grid{
+    grid-template-columns:minmax(0,1.05fr) minmax(250px,.75fr);
+    gap:12px;
+  }
+  .overview-box,.card,.itinerary-day,.map-card{
+    border-radius:20px;
+    padding:15px;
+  }
+  .overview-box h3,.card h3{
+    font-size:1rem;
+  }
+  .task-list{gap:8px;}
+  .task-item{
+    border-radius:15px;
+    padding:11px;
+  }
+  .task-item p{
+    margin:5px 0;
+    line-height:1.35;
+  }
+
+  .map-panel{
+    top:16px;
+  }
+  .map-card{
+    padding:15px;
+  }
+  .map-head{
+    margin-bottom:10px;
+    align-items:center;
+  }
+  .map-head h2{
+    font-size:1.55rem;
+    line-height:1.05;
+  }
+  .map-actions{
+    justify-content:flex-end;
+    gap:7px;
+  }
+  .map{
+    height:clamp(430px,50vh,560px);
+    min-height:430px;
+    border-radius:18px;
+  }
+  .selected-place{
+    margin-top:10px;
+  }
+  .selected-place .card{
+    padding:13px;
+  }
+
+  .itinerary-list{gap:12px;}
+  .day-head{
+    padding:14px 15px;
+  }
+  .day-title strong{
+    font-size:1rem;
+  }
+  .day-title small{
+    font-size:.77rem;
+  }
+  .day-periods{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .period{
+    min-height:132px;
+    padding:14px;
+  }
+  .period-note{
+    line-height:1.42;
+    font-size:.9rem;
+  }
+  .mini-place{
+    padding:8px;
+    margin:8px 0;
+  }
+
+  .filter-row{
+    gap:8px;
+  }
+  .filter-row input,.filter-row select,.form-grid input,.form-grid select,.form-grid textarea,.settings-box input,.settings-box textarea{
+    padding:10px 12px;
+    border-radius:13px;
+  }
+  .card-grid{
+    gap:12px;
+  }
+  .settings-box{
+    border-radius:20px;
+    padding:16px;
+  }
+}
+
+@media (min-width: 1500px){
+  .workspace{
+    grid-template-columns:minmax(0,1.08fr) minmax(540px,.74fr);
+  }
+}
+
+@media (min-width: 1181px) and (max-height: 820px){
+  .main-panel{padding-top:14px;}
+  .topbar{padding:18px 22px;}
+  .topbar h1{font-size:clamp(2.2rem,2.9vw,3.25rem);}
+  .dashboard-grid{margin-bottom:12px;}
+  .metric-card{min-height:92px;padding:12px 14px;}
+  .map{height:clamp(390px,48vh,500px);min-height:390px;}
+  .view{padding:16px;}
+}

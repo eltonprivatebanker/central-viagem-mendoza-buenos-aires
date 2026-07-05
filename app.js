@@ -2443,3 +2443,160 @@ function init(){
   initMap();
   setTimeout(() => { renderMapMarkers(); forceMapRefresh("init-final"); }, 250);
 }
+
+/* ===== v6.9 — visão geral executiva, sidebar compacta e status de nuvem ===== */
+let pendingCloudChangesV69 = false;
+
+function renderHeader(){
+  byId("tripTitle").textContent = data.trip.title;
+  byId("tripSubtitle").textContent = data.trip.subtitle;
+  byId("sidebarSubtitle").textContent = data.trip.title.replace(" em família", "");
+  const copy = document.querySelector(".topbar-copy");
+  if(copy){
+    let chip = document.getElementById("cloudStatusChipV69");
+    if(!chip){
+      chip = document.createElement("div");
+      chip.id = "cloudStatusChipV69";
+      chip.className = "cloud-status-chip-v69";
+      copy.appendChild(chip);
+    }
+    const configured = cloudConfigured();
+    const last = data.settings?.lastSyncAt ? new Date(data.settings.lastSyncAt).toLocaleString("pt-BR") : "Nunca";
+    chip.className = `cloud-status-chip-v69 ${configured ? "ready" : "local"} ${pendingCloudChangesV69 ? "dirty" : ""}`;
+    chip.innerHTML = configured
+      ? pendingCloudChangesV69
+        ? `☁️ Alterações locais — clique em <strong>Salvar na nuvem</strong>`
+        : `☁️ Nuvem conectada · último sync: ${escapeHtml(last)}`
+      : `💾 Salvando neste navegador`;
+  }
+}
+
+function renderSidebarDays(){
+  const days = sortedDays();
+  byId("sidebarDays").innerHTML = days
+    .map((day, idx) => `<button class="sidebar-day sidebar-day-v69" data-jump-day="${day.id}">
+      <span>Dia ${String(idx + 1).padStart(2,"0")}</span>
+      <small><b>${escapeHtml(day.date || "—")}</b><em>${escapeHtml(canonicalizeCityV68(day.city) || day.title || "Etapa")}</em></small>
+    </button>`).join("");
+  document.querySelectorAll("[data-jump-day]").forEach(btn => btn.onclick = () => {
+    setView("itinerary");
+    setTimeout(() => document.querySelector(`[data-day-card="${btn.dataset.jumpDay}"]`)?.scrollIntoView({ behavior:"smooth", block:"start" }), 100);
+  });
+}
+
+function renderOverview(){
+  canonicalizeDataSetV68(false);
+  const done = data.tasks.filter(t => t.done).length;
+  const openTasks = data.tasks.filter(t => !t.done);
+  const critical = openTasks.filter(t => t.critical);
+  const pending = openTasks.filter(t => !t.critical);
+  const pct = data.tasks.length ? Math.round(done / data.tasks.length * 100) : 0;
+  const nextDay = sortedDays()[0];
+  const topCritical = critical.slice(0, 2);
+  const fallbackPending = topCritical.length < 2 ? pending.slice(0, 2 - topCritical.length) : [];
+  const topTasks = [...topCritical, ...fallbackPending];
+  const hiddenOpenCount = Math.max(0, openTasks.length - topTasks.length);
+  const testCount = testDataCountV68();
+  const cityRows = uniqueCities().map(city => ({
+    city,
+    places: data.places.filter(p => canonicalizeCityV68(p.city) === city).length,
+    reservations: data.reservations.filter(r => canonicalizeCityV68(r.city) === city).length,
+    expenses: data.expenses.filter(e => canonicalizeCityV68(e.city) === city).reduce((s,e)=>s+Number(e.expected||0),0)
+  })).filter(row => row.places || row.reservations || row.expenses);
+
+  byId("overviewContent").innerHTML = `
+    <div class="overview-grid overview-grid-v69">
+      <div class="overview-box overview-executive-v69">
+        <div class="overview-title-row-v68 overview-title-row-v69">
+          <h3>Checklist executivo</h3>
+          ${testCount ? `<button class="ghost tiny danger" data-clean-test-v68>Limpar testes (${testCount})</button>` : ""}
+        </div>
+        <div class="progress-bar compact-progress-v69"><span style="width:${pct}%"></span></div>
+        <div class="overview-status-grid-v68 overview-status-grid-v69">
+          <span><strong>${critical.length}</strong><small>críticas</small></span>
+          <span><strong>${pending.length}</strong><small>pendentes</small></span>
+          <span><strong>${done}</strong><small>concluídas</small></span>
+        </div>
+        <div class="task-focus-v69">
+          <div class="task-focus-head-v69">
+            <strong>Prioridade agora</strong>
+            ${hiddenOpenCount ? `<small>${hiddenOpenCount} pendência(s) a mais</small>` : `<small>sem ocultas</small>`}
+          </div>
+          ${topTasks.map(task => `
+            <div class="compact-task-v68 compact-task-v69 ${task.critical ? "critical" : ""}">
+              <input type="checkbox" ${task.done ? "checked" : ""} data-task-toggle="${task.id}" />
+              <div>
+                <strong>${escapeHtml(task.title)}</strong>
+                ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+              </div>
+              <span class="tag ${task.critical ? "critical" : "pending"}">${task.critical ? "Crítico" : "Pendente"}</span>
+            </div>`).join("") || `<div class="empty-state">Nenhuma pendência aberta.</div>`}
+        </div>
+        <details class="details-compact-v68 details-compact-v69">
+          <summary>Ver / editar todas as pendências</summary>
+          <div class="task-list task-list-v68-full task-list-v69-full">
+            ${data.tasks.map(task => `
+              <div class="task-item task-item-v69">
+                <input type="checkbox" ${task.done ? "checked" : ""} data-task-toggle="${task.id}" />
+                <div>
+                  <strong>${escapeHtml(task.title)}</strong>
+                  <span class="tag ${task.done ? "ok" : task.critical ? "critical" : "pending"}">${task.done ? "Concluído" : task.critical ? "Crítico" : "Pendente"}</span>
+                  ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+                  <div class="card-actions">
+                    <button class="ghost tiny" data-edit-task="${task.id}">Editar</button>
+                    <button class="ghost tiny danger" data-delete-task="${task.id}">Excluir</button>
+                  </div>
+                </div>
+              </div>`).join("") || `<div class="empty-state">Nenhuma pendência cadastrada.</div>`}
+          </div>
+        </details>
+      </div>
+      <div class="overview-box overview-compact-v68 overview-op-v69">
+        <h3>Resumo operacional</h3>
+        <div class="operation-next-v68 operation-next-v69">
+          <span>Próximo dia</span>
+          <strong>${nextDay ? escapeHtml(dayLabel(nextDay.id)) : "Nenhum dia cadastrado."}</strong>
+        </div>
+        <p class="muted"><strong>Pessoas:</strong><br>${escapeHtml(data.trip.people || "—")}</p>
+        <div class="city-breakdown city-breakdown-v68 city-breakdown-v69">
+          ${cityRows.slice(0,4).map(row => `
+            <div class="city-row">
+              <div><strong>${escapeHtml(row.city)}</strong><br><small class="muted">${row.places} lugar(es) · ${row.reservations} reserva(s)</small></div>
+              <span>${formatCurrency(row.expenses)}</span>
+            </div>`).join("") || `<p class="muted">Cadastre lugares, reservas ou despesas para montar o resumo.</p>`}
+          ${cityRows.length > 4 ? `<small class="muted">+ ${cityRows.length - 4} região(ões) no resumo completo das abas.</small>` : ""}
+        </div>
+      </div>
+    </div>`;
+
+  document.querySelectorAll("[data-task-toggle]").forEach(el => el.onchange = () => {
+    const task = data.tasks.find(t => t.id === el.dataset.taskToggle);
+    if(task){ task.done = el.checked; saveAndRender("Pendência atualizada"); }
+  });
+  document.querySelectorAll("[data-edit-task]").forEach(el => el.onclick = () => openTaskModal(data.tasks.find(t => t.id === el.dataset.editTask)));
+  document.querySelectorAll("[data-delete-task]").forEach(el => el.onclick = () => deleteItem("tasks", el.dataset.deleteTask, "Excluir esta pendência?"));
+  document.querySelector("[data-clean-test-v68]")?.addEventListener("click", cleanTestDataV68);
+}
+
+function saveAndRender(message="Salvo"){
+  canonicalizeDataSetV68(false);
+  saveData();
+  if(cloudConfigured()) pendingCloudChangesV69 = true;
+  renderAll();
+  showToast(cloudConfigured() && !data.settings.autoSync ? `${message}. Alteração local; use Salvar na nuvem.` : message);
+  scheduleCloudSave();
+}
+
+async function saveCloudNow(silent=false){
+  if(!cloudConfigured()) { if(!silent) showToast("Ative Google Sheets nas configurações."); return; }
+  try{
+    if(!silent) showToast("Salvando na nuvem...");
+    const payload = { data:sanitizeDataForCloud(data), settings:{ calendarId:data.settings.calendarId || "", driveFolderId:data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || "") || "" } };
+    const json = await cloudRequest("saveAll", payload);
+    data.settings.lastSyncAt = new Date().toISOString();
+    pendingCloudChangesV69 = false;
+    saveData();
+    renderAll();
+    if(!silent) showToast(json.message || "Salvo no Google Sheets");
+  }catch(err){ if(!silent) showToast(err.message); }
+}

@@ -2600,3 +2600,233 @@ async function saveCloudNow(silent=false){
     if(!silent) showToast(json.message || "Salvo no Google Sheets");
   }catch(err){ if(!silent) showToast(err.message); }
 }
+
+
+/* ===== v7.0 — fluidez de agenda, calendário em campos de data e leitura rápida do dia ===== */
+function toInputDateV70(value){
+  const p = parseDateParts(value);
+  if(!p) return "";
+  return `${String(p.y).padStart(4,"0")}-${pad2(p.m)}-${pad2(p.d)}`;
+}
+function fromInputDateV70(value){
+  const raw = String(value || "").trim();
+  if(!raw) return "";
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) return `${m[3]}/${m[2]}`;
+  return raw;
+}
+function weekdayLabelV70(value){
+  const p = parseDateParts(value);
+  if(!p) return "";
+  const d = new Date(p.y, p.m - 1, p.d, 12, 0, 0);
+  let w = d.toLocaleDateString("pt-BR", { weekday:"short" }).replace(".", "");
+  w = w ? w.charAt(0).toUpperCase() + w.slice(1) : "";
+  return `${w} ${pad2(p.d)}/${pad2(p.m)}`;
+}
+function dateInputV70(name, label, value="", attrs=""){
+  return `<label>${escapeHtml(label)}<input name="${escapeAttr(name)}" type="date" value="${escapeAttr(toInputDateV70(value))}" ${attrs} /></label>`;
+}
+function parsePeriodRangeV70(period){
+  const raw = String(period || "");
+  const parts = raw.split(/\s+a\s+/i);
+  return { start: parts[0] || "", end: parts[1] || "" };
+}
+function periodRangeFromInputsV70(start, end, fallback=""){
+  const s = fromInputDateV70(start);
+  const e = fromInputDateV70(end);
+  if(s && e) return `${s} a ${e}`;
+  if(s) return s;
+  return fallback || "";
+}
+function dayMetaV70(day, idx){
+  const date = day.date || "";
+  const weekday = weekdayLabelV70(date);
+  const city = canonicalizeCityV68(day.city) || "Etapa";
+  return {
+    number: `Dia ${String(idx + 1).padStart(2,"0")}`,
+    date,
+    weekday: weekday || date || "sem data",
+    city,
+    title: day.title || "Dia da viagem"
+  };
+}
+function dayLabel(dayId){
+  const sorted = sortedDays();
+  const d = sorted.find(x => x.id === dayId);
+  if(!d) return "Sem dia definido";
+  const idx = sorted.findIndex(x => x.id === dayId);
+  const meta = dayMetaV70(d, idx);
+  return `${meta.number} · ${meta.date || meta.weekday} · ${meta.title}`;
+}
+function openTripModal(){
+  const range = parsePeriodRangeV70(data.trip.period);
+  openModal("Editar dados da viagem", `<div class="form-grid form-grid-v70">
+    <div class="full">${input("title", "Título", data.trip.title)}</div>
+    <div class="full">${textarea("subtitle", "Descrição", data.trip.subtitle)}</div>
+    ${dateInputV70("periodStart", "Início da viagem", range.start)}
+    ${dateInputV70("periodEnd", "Fim da viagem", range.end)}
+    ${input("year", "Ano da viagem", data.trip.year || new Date().getFullYear(), "number", 'min="2020" max="2100"')}
+    ${input("base", "Base inicial", data.trip.base)}
+    <div class="full">${input("people", "Pessoas", data.trip.people)}</div>
+  </div>`, fd => {
+    data.trip.title = fd.get("title").toString().trim();
+    data.trip.subtitle = fd.get("subtitle").toString().trim();
+    data.trip.period = periodRangeFromInputsV70(fd.get("periodStart"), fd.get("periodEnd"), data.trip.period);
+    data.trip.year = fd.get("year").toString().trim() || data.trip.year;
+    data.trip.base = fd.get("base").toString().trim();
+    data.trip.people = fd.get("people").toString().trim();
+    closeModal(); saveAndRender("Viagem atualizada");
+  });
+}
+function openDayModal(day=null){
+  const d = day || { id: uid(), number: nextDayNumber(), label:"", date:"", title:"Novo dia", city:"Deslocamento", morning:"", afternoon:"", night:"", lodging:"", transport:"", notes:"" };
+  const dateQuick = d.date || "";
+  openModal(day ? "Editar dia da viagem" : "Adicionar novo dia", `<div class="day-form-v70">
+    <div class="form-grid form-grid-v70 day-form-main-v70">
+      ${dateInputV70("date", "Data", dateQuick, "required")}
+      ${selectInput("city", "Cidade / etapa", canonicalizeCityV68(d.city) || "Deslocamento", [{value:"Deslocamento",label:"Deslocamento"}, ...cityOptions(canonicalizeCityV68(d.city))])}
+      <div class="full">${input("title", "Título do dia", d.title, "text", 'placeholder="Ex.: Recoleta e Palermo" required')}</div>
+    </div>
+    <div class="period-editor-v70">
+      <label><span>Manhã</span><textarea name="morning" placeholder="O que acontece de manhã?">${escapeHtml(d.morning || "")}</textarea></label>
+      <label><span>Tarde</span><textarea name="afternoon" placeholder="O que acontece à tarde?">${escapeHtml(d.afternoon || "")}</textarea></label>
+      <label><span>Noite</span><textarea name="night" placeholder="O que acontece à noite?">${escapeHtml(d.night || "")}</textarea></label>
+    </div>
+    <details class="advanced-form-v70">
+      <summary>Avançado: hospedagem, deslocamento e numeração</summary>
+      <div class="form-grid form-grid-v70">
+        ${input("number", "Número do dia", d.number, "number", 'min="1"')}
+        ${input("label", "Rótulo curto", d.label, "text", 'placeholder="Ex.: Seg 27/07"')}
+        ${input("lodging", "Hospedagem do dia", d.lodging)}
+        ${input("transport", "Deslocamento do dia", d.transport)}
+        <div class="full">${textarea("notes", "Observações", d.notes)}</div>
+      </div>
+    </details>
+  </div>`, fd => {
+    const date = fromInputDateV70(fd.get("date"));
+    const autoLabel = weekdayLabelV70(date);
+    const payload = {
+      id: d.id,
+      number: Number(fd.get("number") || d.number || nextDayNumber()),
+      date,
+      label: fd.get("label").toString().trim() || autoLabel,
+      city: fd.get("city").toString().trim(),
+      title: fd.get("title").toString().trim() || "Dia da viagem",
+      morning: fd.get("morning").toString().trim(),
+      afternoon: fd.get("afternoon").toString().trim(),
+      night: fd.get("night").toString().trim(),
+      lodging: fd.get("lodging")?.toString().trim() || "",
+      transport: fd.get("transport")?.toString().trim() || "",
+      notes: fd.get("notes")?.toString().trim() || ""
+    };
+    if(day) Object.assign(day, payload); else data.days.push(payload);
+    data.days.sort((a,b)=> dateSortValue(a).localeCompare(dateSortValue(b)) || Number(a.number)-Number(b.number));
+    renumberDays(false);
+    closeModal(); saveAndRender("Dia salvo");
+  });
+}
+function periodSummaryV70(day, key, title, note){
+  const places = data.places.filter(p => p.dayId === day.id && p.period === key);
+  const periodReservations = data.reservations.filter(r => (r.dayId === day.id || r.date === day.date) && ((key === "morning" && (!r.time || String(r.time) < "12:00")) || (key === "afternoon" && String(r.time || "14:00") >= "12:00" && String(r.time || "14:00") < "18:00") || (key === "night" && String(r.time || "19:00") >= "18:00")));
+  return `<div class="period period-v70">
+    <div class="period-title-row-v70"><strong>${title}</strong><button class="ghost tiny" data-edit-day="${day.id}">Editar</button></div>
+    ${note ? `<div class="period-note period-note-v70">${escapeHtml(note)}</div>` : `<div class="empty-period-v70">Sem programação definida</div>`}
+    <div class="period-linked-v70">
+      ${places.map(place => `<button class="mini-place-v70" data-select-place="${place.id}"><span>📍</span><strong>${escapeHtml(place.name)}</strong><small>${escapeHtml(place.startTime || defaultPeriodStart(key))}</small></button>`).join("")}
+      ${periodReservations.slice(0,2).map(r => `<button class="mini-place-v70 reservation" data-edit-reservation="${r.id}"><span>🎫</span><strong>${escapeHtml(r.title)}</strong><small>${escapeHtml(r.time || "")}</small></button>`).join("")}
+    </div>
+    <button class="ghost tiny add-period-v70" data-add-place-to-day="${day.id}" data-period="${key}">+ lugar neste período</button>
+  </div>`;
+}
+function renderItinerary(){
+  const sorted = sortedDays();
+  byId("itineraryList").innerHTML = sorted.map((day, idx) => {
+    const meta = dayMetaV70(day, idx);
+    const dayPlaces = data.places.filter(p => p.dayId === day.id);
+    const dayReservations = data.reservations.filter(r => r.dayId === day.id || (r.date && r.date === day.date));
+    const statusText = `${dayPlaces.length} lugar(es) · ${dayReservations.length} reserva(s)`;
+    return `<article class="itinerary-day itinerary-day-v70" data-day-card="${day.id}">
+      <div class="day-head day-head-v70">
+        <div class="day-main-v70">
+          <span class="day-number-v70">${meta.number}</span>
+          <div>
+            <strong>${escapeHtml(meta.title)}</strong>
+            <small>${escapeHtml(meta.weekday)} · ${escapeHtml(meta.city)} · ${escapeHtml(statusText)}</small>
+          </div>
+        </div>
+        <div class="day-actions-v70">
+          <button class="secondary tiny" data-edit-day="${day.id}">Editar dia</button>
+          <button class="ghost tiny" data-add-place-to-day="${day.id}" data-period="free">+ lugar</button>
+          <button class="ghost tiny" data-day-calendar="${day.id}">Google Agenda</button>
+          <details class="day-more-v70"><summary>Mais</summary><div>
+            <button class="ghost tiny" data-move-day="${day.id}" data-dir="up" ${idx===0?"disabled":""}>Mover ↑</button>
+            <button class="ghost tiny" data-move-day="${day.id}" data-dir="down" ${idx===sorted.length-1?"disabled":""}>Mover ↓</button>
+            <button class="ghost tiny" data-duplicate-day="${day.id}">Duplicar</button>
+            <button class="ghost tiny danger" data-delete-day="${day.id}">Excluir</button>
+          </div></details>
+        </div>
+      </div>
+      <div class="day-periods day-periods-v70">
+        ${periodSummaryV70(day, "morning", "Manhã", day.morning)}
+        ${periodSummaryV70(day, "afternoon", "Tarde", day.afternoon)}
+        ${periodSummaryV70(day, "night", "Noite", day.night)}
+      </div>
+      ${(day.lodging || day.transport || day.notes || dayReservations.length) ? `<div class="day-footer-v70">
+        ${day.lodging ? `<span>🏨 ${escapeHtml(day.lodging)}</span>` : ""}
+        ${day.transport ? `<span>🚗 ${escapeHtml(day.transport)}</span>` : ""}
+        ${day.notes ? `<span>📝 ${escapeHtml(day.notes)}</span>` : ""}
+        ${dayReservations.length ? `<span>🎫 ${dayReservations.length} reserva(s) vinculada(s)</span>` : ""}
+      </div>` : ""}
+    </article>`;
+  }).join("") || `<div class="empty-state">Nenhum dia cadastrado. Clique em + Novo dia.</div>`;
+  document.querySelectorAll("[data-edit-day]").forEach(el => el.onclick = () => openDayModal(data.days.find(d => d.id === el.dataset.editDay)));
+  document.querySelectorAll("[data-delete-day]").forEach(el => el.onclick = () => deleteDay(el.dataset.deleteDay));
+  document.querySelectorAll("[data-duplicate-day]").forEach(el => el.onclick = () => duplicateDay(el.dataset.duplicateDay));
+  document.querySelectorAll("[data-move-day]").forEach(el => el.onclick = () => moveDay(el.dataset.moveDay, el.dataset.dir));
+  document.querySelectorAll("[data-add-place-to-day]").forEach(el => openPlaceBtnBindV70(el));
+  document.querySelectorAll("[data-select-place]").forEach(el => el.onclick = () => selectPlace(el.dataset.selectPlace));
+  document.querySelectorAll("[data-edit-reservation]").forEach(el => el.onclick = () => openReservationModal(data.reservations.find(r => r.id === el.dataset.editReservation)));
+  document.querySelectorAll("[data-day-calendar]").forEach(el => el.onclick = () => openGoogleCalendarForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayCalendar))));
+}
+function openPlaceBtnBindV70(el){
+  el.onclick = () => openPlaceModal(null, { dayId: el.dataset.addPlaceToDay, period: el.dataset.period });
+}
+function openReservationModal(res=null){
+  const r = res || { id: uid(), type:"Hospedagem", title:"", status:"Pendente", city:"", date:"", time:"", endDate:"", amount:0, paid:0, dayId:"", link:"", notes:"" };
+  openModal(res ? "Editar reserva" : "Nova reserva", `<div class="form-grid form-grid-v70">
+    ${selectInput("type", "Tipo", r.type, ["Voo","Hospedagem","Carro","Trem/ônibus","Passeio","Restaurante","Seguro","Outro"])}
+    ${selectInput("status", "Status", r.status, ["Pendente","Reservado","Pago","Cancelado"])}
+    <div class="full">${input("title", "Título", r.title, "text", "required")}</div>
+    ${selectInput("city", "Cidade / região", canonicalizeCityV68(r.city), cityOptions(canonicalizeCityV68(r.city)))}
+    ${dateInputV70("date", "Data inicial", r.date)}
+    ${input("time", "Horário", r.time, "time")}
+    ${dateInputV70("endDate", "Data final", r.endDate)}
+    ${selectInput("dayId", "Vincular ao dia", r.dayId, dayOptions(true))}
+    ${input("amount", "Valor previsto", r.amount, "number", 'step="0.01"')}
+    ${input("paid", "Valor pago", r.paid, "number", 'step="0.01"')}
+    <div class="full">${input("link", "Link da reserva", r.link, "url")}</div>
+    <div class="full">${textarea("notes", "Observações", r.notes)}</div>
+  </div>`, fd => {
+    const payload = { id:r.id, type:fd.get("type").toString(), status:fd.get("status").toString(), title:fd.get("title").toString().trim(), city:fd.get("city").toString().trim(), date:fromInputDateV70(fd.get("date")), time:fd.get("time").toString().trim(), endDate:fromInputDateV70(fd.get("endDate")), dayId:fd.get("dayId").toString(), amount:Number(fd.get("amount")||0), paid:Number(fd.get("paid")||0), link:fd.get("link").toString().trim(), location:fd.get("city").toString().trim(), notes:fd.get("notes").toString().trim() };
+    if(res) Object.assign(res, payload); else data.reservations.push(payload);
+    closeModal(); saveAndRender("Reserva salva");
+  });
+}
+function openExpenseModal(exp=null){
+  const e = exp || { id:uid(), category:"Alimentação", title:"", city:"", date:"", expected:0, paid:0, status:"Previsto", person:"Família", notes:"" };
+  openModal(exp ? "Editar despesa" : "Nova despesa", `<div class="form-grid form-grid-v70">
+    <div class="full">${input("title", "Descrição", e.title, "text", "required")}</div>
+    ${selectInput("category", "Categoria", e.category, ["Hospedagem","Transporte","Alimentação","Passeios","Compras","Documentos","Seguro","Outro"])}
+    ${selectInput("status", "Status", e.status, ["Previsto","Pago","Pendente","Cancelado"])}
+    ${selectInput("city", "Cidade / região", canonicalizeCityV68(e.city), cityOptions(canonicalizeCityV68(e.city)))}
+    ${dateInputV70("date", "Data", e.date)}
+    ${input("expected", "Valor previsto", e.expected, "number", 'step="0.01"')}
+    ${input("paid", "Valor pago", e.paid, "number", 'step="0.01"')}
+    ${input("person", "Responsável", e.person)}
+    <div class="full">${textarea("notes", "Observações", e.notes)}</div>
+  </div>`, fd => {
+    const payload = { id:e.id, title:fd.get("title").toString().trim(), category:fd.get("category").toString(), status:fd.get("status").toString(), city:fd.get("city").toString().trim(), date:fromInputDateV70(fd.get("date")), expected:Number(fd.get("expected")||0), paid:Number(fd.get("paid")||0), person:fd.get("person").toString().trim(), notes:fd.get("notes").toString().trim() };
+    if(exp) Object.assign(exp, payload); else data.expenses.push(payload);
+    closeModal(); saveAndRender("Despesa salva");
+  });
+}

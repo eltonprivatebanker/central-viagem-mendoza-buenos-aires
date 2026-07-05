@@ -1,17 +1,19 @@
-# Central de Viagem — v6.9 Home executiva
+# Central de Viagem — v7.0 Agenda fluida
 
-Versão com ajustes de usabilidade e refinamento visual da tela inicial.
+Versão focada em fluidez no desktop e nos cadastros da viagem.
 
 ## O que mudou
 
-- Visão geral mais executiva, mostrando no máximo 2 pendências prioritárias.
-- Lista completa de pendências fica recolhida em “Ver / editar todas”.
-- Sidebar de dias mais compacta para mostrar mais itens.
-- Status de nuvem mais claro no topo.
-- Botão de salvar na nuvem fica mais evidente quando há alterações locais.
-- Mapa levemente mais compacto na visão geral para reduzir peso visual.
-- Mantém a integração Google Sheets/Apps Script já validada.
+- Campos de data agora usam seletor de calendário (`type=date`).
+- Edição de dados da viagem com início e fim separados.
+- Modal de dia simplificado: data, cidade/etapa, título e manhã/tarde/noite em destaque.
+- Campos avançados de dia ficam recolhidos.
+- Itinerário mais legível para bater o olho: dia, data, cidade, lugares e reservas.
+- Botão principal “Editar dia” mais claro.
+- Botões técnicos de mover, duplicar e excluir foram para “Mais”.
+- Reservas e despesas também usam seletor de data.
+- Mantém integração Google Sheets / Apps Script já validada.
 
-## Subida no GitHub
+## Como subir
 
-Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
+Envie os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5.

@@ -3415,3 +3415,142 @@ async function uploadDocumentToDrive(id, options={}){
     showToast(err.message);
   }
 }
+
+/* ===== v7.7 — documento/anexo minimalista e fluxo de upload mais claro ===== */
+function documentTitleFromFileV77(fileName=""){
+  return String(fileName || "")
+    .replace(/\.[a-z0-9]{2,8}$/i, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function guessDocCategoryFromFileV77(fileName=""){
+  const text = normalizeForSearchV72(String(fileName || ""));
+  if(/(rg|cpf|passaporte|documento|autorizacao|menor)/i.test(text)) return "Documentos pessoais";
+  if(/(voo|bilhete|passagem|checkin|check in|boarding|localizador|desloc|onibus|trem|aereo|aeroporto)/i.test(text)) return "Deslocamentos";
+  if(/(hotel|hospedagem|booking|airbnb)/i.test(text)) return "Hospedagem";
+  if(/(carro|locadora|aluguel|rent|caucao)/i.test(text)) return "Carro";
+  if(/(passeio|ingresso|ticket|voucher|tour|parque|vinicola)/i.test(text)) return "Passeios";
+  if(/(seguro|apolice|assistencia)/i.test(text)) return "Seguro";
+  if(/(comprovante|recibo|pix|cartao|pagamento|transacao|orcamento)/i.test(text)) return "Comprovante";
+  return "Documentos pessoais";
+}
+openDocumentModal = function(doc=null){
+  const d = doc || { id: uid(), title:"", category:"Documentos pessoais", status:"Pendente", dayId:"", link:"", notes:"", file:null, driveFileId:"", uploadStatus:"", driveFolderName:"" };
+  const initialFolder = folderHintV76(d);
+  const currentFileText = d.driveFileId
+    ? `☁️ Já salvo no Drive${d.driveFolderName ? ` em ${escapeHtml(d.driveFolderName)}` : ""}`
+    : d.file
+      ? `📎 Arquivo atual: ${escapeHtml(d.file.name)} · ${fileSize(d.file.size)}`
+      : "Nenhum arquivo selecionado";
+  openModal(doc ? "Editar documento" : "Adicionar documento", `<div class="doc-modal-v77">
+    <div class="doc-upload-hero-v77">
+      <div>
+        <strong>1. Escolha o arquivo</strong>
+        <span>PDF, imagem ou comprovante até 8 MB. Ao salvar, envio para a subpasta correta do Drive.</span>
+      </div>
+      <label class="doc-file-button-v77" for="docFileInputV77">Procurar arquivo</label>
+      <input id="docFileInputV77" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx" />
+    </div>
+
+    <div id="driveUploadPreview" class="doc-file-status-v77"><span>${currentFileText}</span>${d.link ? `<a href="${escapeAttr(d.link)}" target="_blank" rel="noopener">Abrir</a>` : ""}</div>
+    <div class="doc-destination-v77" id="driveFolderPreviewV76">Destino previsto: ${escapeHtml(initialFolder)}</div>
+
+    <div class="doc-quick-grid-v77">
+      ${input("title", "Nome do documento", d.title, "text", 'placeholder="Ex.: Bilhete de viagem"')}
+      ${selectInput("category", "Categoria", d.category, ["Documentos pessoais","Seguro","Hospedagem","Deslocamentos","Passeios","Orçamento","Comprovante","Outro"])}
+      ${selectInput("status", "Status", d.status, ["Pendente","Concluído"])}
+      ${selectInput("dayId", "Dia relacionado", d.dayId, dayOptions(true))}
+    </div>
+
+    <details class="advanced-box doc-advanced-v77">
+      <summary>Mais detalhes opcionais</summary>
+      <div class="advanced-grid form-grid">
+        <div class="full">${input("link", "Link externo / Google Drive", d.link, "url", 'placeholder="Opcional: cole um link se o arquivo já estiver no Drive"')}</div>
+        <div class="full">${textarea("notes", "Observações", d.notes)}</div>
+      </div>
+    </details>
+  </div>`, async (fd, form, modalApi={}) => {
+    const fileInput = form.querySelector('input[name="file"]');
+    const preview = form.querySelector('#driveUploadPreview');
+    const file = fileInput?.files?.[0];
+    const payload = {
+      id:d.id,
+      title:fd.get("title").toString().trim(),
+      category:fd.get("category").toString(),
+      status:fd.get("status").toString(),
+      dayId:fd.get("dayId").toString(),
+      link:fd.get("link").toString().trim(),
+      notes:fd.get("notes").toString().trim(),
+      file:d.file || null,
+      driveFileId:d.driveFileId || "",
+      driveFolderName:d.driveFolderName || "",
+      driveFolderId:d.driveFolderId || "",
+      driveFolderUrl:d.driveFolderUrl || "",
+      uploadStatus:d.uploadStatus || ""
+    };
+    if(file && !payload.title) payload.title = documentTitleFromFileV77(file.name) || file.name;
+    if(!payload.title) payload.title = "Documento da viagem";
+    payload.driveFolderName = expectedDriveFolderV76({ ...payload, file: file ? { name:file.name } : payload.file });
+
+    if(file){
+      if(file.size > 8 * 1024 * 1024){
+        showToast("Arquivo acima de 8 MB. Suba no Drive e cole o link em Mais detalhes.");
+        if(preview) preview.innerHTML = `<span>⚠️ ${escapeHtml(file.name)} · ${fileSize(file.size)} · acima de 8 MB</span>`;
+        return;
+      }
+      modalApi.setSubmitText?.("Lendo arquivo...");
+      if(preview) preview.innerHTML = `<span>⏳ Lendo ${escapeHtml(file.name)}...</span>`;
+      payload.file = await readFileAsDataUrl(file);
+      payload.driveFileId = "";
+      payload.uploadStatus = cloudConfigured() ? "uploadingDrive" : "localOnly";
+      payload.driveFolderName = expectedDriveFolderV76({ ...payload, file:payload.file });
+      if(preview) preview.innerHTML = `<span>✅ ${escapeHtml(file.name)} pronto. Destino: ${escapeHtml(payload.driveFolderName)}</span>`;
+    }
+    if(doc) Object.assign(doc, payload); else data.documents.push(payload);
+    const targetId = payload.id;
+    closeModal();
+    saveData();
+    renderAll();
+    if(file && cloudConfigured()){
+      showToast(`Enviando arquivo ao Google Drive em ${payload.driveFolderName}. Aguarde...`);
+      await uploadDocumentToDrive(targetId, { auto:true });
+    }else{
+      showToast(file ? "Documento salvo apenas neste navegador" : "Documento salvo");
+      scheduleCloudSave();
+    }
+  }, cloudConfigured() ? "Salvar e enviar ao Drive" : "Salvar documento");
+
+  setTimeout(() => {
+    const form = byId("modalForm");
+    const fileInput = form?.querySelector('input[name="file"]');
+    const categoryInput = form?.querySelector('[name="category"]');
+    const titleInput = form?.querySelector('[name="title"]');
+    const preview = form?.querySelector('#driveUploadPreview');
+    const folderPreview = form?.querySelector('#driveFolderPreviewV76');
+    const submit = byId("modalSubmit");
+    const updateFolder = () => {
+      if(!folderPreview) return;
+      const folder = expectedDriveFolderV76({ category:categoryInput?.value || d.category, title:titleInput?.value || d.title, file:fileInput?.files?.[0] ? { name:fileInput.files[0].name } : d.file, notes:"" });
+      folderPreview.textContent = `Destino previsto: ${folder}`;
+    };
+    categoryInput?.addEventListener("change", updateFolder);
+    titleInput?.addEventListener("input", updateFolder);
+    if(!fileInput || !preview) return;
+    fileInput.onchange = () => {
+      const file = fileInput.files?.[0];
+      if(!file){ preview.innerHTML = `<span>Nenhum arquivo selecionado</span>`; updateFolder(); return; }
+      if(!titleInput.value.trim()) titleInput.value = documentTitleFromFileV77(file.name);
+      const guessed = guessDocCategoryFromFileV77(file.name);
+      if(categoryInput && (!doc || !categoryInput.value || categoryInput.value === "Documentos pessoais")) categoryInput.value = guessed;
+      updateFolder();
+      const folder = expectedDriveFolderV76({ category:categoryInput?.value || d.category, title:titleInput?.value || d.title, file:{ name:file.name } });
+      const isLarge = file.size > 8 * 1024 * 1024;
+      preview.innerHTML = `<span>${isLarge ? "⚠️" : "✅"} ${escapeHtml(file.name)} · ${fileSize(file.size)}</span><small>${isLarge ? "Arquivo grande: suba manualmente no Drive" : (cloudConfigured() ? `Será enviado para ${escapeHtml(folder)}` : "Será salvo somente neste navegador")}</small>`;
+      if(submit && !isLarge) submit.textContent = cloudConfigured() ? "Salvar e enviar ao Drive" : "Salvar documento";
+      showToast(isLarge ? "Arquivo grande demais para envio automático." : `Arquivo selecionado. Destino: ${folder}`);
+    };
+    updateFolder();
+  }, 80);
+};
+

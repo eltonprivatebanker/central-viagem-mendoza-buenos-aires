@@ -1,7 +1,7 @@
 
 /**
  * Central de Viagem — Backend Google Sheets + Drive + Agenda
- * Versão v7.3 — JSONP/CORS + upload automático no Drive
+ * Versão v7.4 — JSONP/CORS + upload automático no Drive
  *
  * Como usar:
  * 1) Crie uma Planilha Google chamada "Central de Viagem".

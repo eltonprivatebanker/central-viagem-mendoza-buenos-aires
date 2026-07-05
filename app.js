@@ -509,7 +509,7 @@ function renderDocuments(){
       <p>${escapeHtml(doc.notes || "Sem observações.")}</p>
       <p class="muted"><strong>Dia:</strong> ${dayLabel(doc.dayId)}</p>
       ${doc.file ? `<div class="file-chip"><span>📎 ${escapeHtml(doc.file.name)} · ${fileSize(doc.file.size)}</span>${doc.file.dataUrl ? `<button class="ghost tiny" data-download-doc="${doc.id}">Baixar local</button>` : ""}</div>` : ""}
-      ${doc.driveFileId ? `<p class="muted"><strong>Drive:</strong> arquivo salvo automaticamente na pasta configurada.</p>` : doc.uploadStatus === "pendingDrive" ? `<p class="muted"><strong>Drive:</strong> envio em processamento. Use “Carregar da nuvem” em alguns segundos se o link ainda não aparecer.</p>` : ""}
+      ${doc.driveFileId ? `<p class="muted"><strong>Drive:</strong> arquivo salvo automaticamente na pasta configurada.</p>` : doc.uploadStatus === "uploadingDrive" ? `<p class="muted"><strong>Drive:</strong> enviando agora. Aguarde a confirmação.</p>` : doc.uploadStatus === "pendingDrive" ? `<p class="muted"><strong>Drive:</strong> envio solicitado. Clique em “Carregar da nuvem” em alguns segundos se o link ainda não aparecer.</p>` : doc.uploadStatus === "uploadError" ? `<p class="muted"><strong>Drive:</strong> não consegui confirmar o envio. Use “Reenviar ao Drive” ou cole o link manualmente.</p>` : ""}
       <div class="card-actions">
         <button class="ghost tiny" data-edit-doc="${doc.id}">Editar / anexar</button>
         ${doc.link ? `<a class="ghost tiny" href="${escapeAttr(doc.link)}" target="_blank" rel="noopener">Abrir no Drive/link</a>` : ""}
@@ -756,13 +756,29 @@ function dayOptions(includeEmpty=true){
 function openModal(title, bodyHtml, onSubmit, submitText="Salvar"){
   byId("modalTitle").textContent = title;
   byId("modalBody").innerHTML = bodyHtml;
-  byId("modalSubmit").textContent = submitText;
+  const submit = byId("modalSubmit");
+  submit.textContent = submitText;
+  submit.disabled = false;
   byId("modalBackdrop").hidden = false;
   const form = byId("modalForm");
   form.onsubmit = async event => {
     event.preventDefault();
     const fd = new FormData(form);
-    await onSubmit(fd, form);
+    const originalText = submit.textContent || submitText;
+    submit.disabled = true;
+    submit.textContent = "Processando...";
+    try{
+      await onSubmit(fd, form, {
+        setSubmitText: text => { submit.textContent = text; },
+        setDisabled: value => { submit.disabled = Boolean(value); }
+      });
+    }catch(err){
+      showToast(err.message || String(err));
+      if(!byId("modalBackdrop").hidden){
+        submit.disabled = false;
+        submit.textContent = originalText;
+      }
+    }
   };
   setTimeout(() => form.querySelector("input,textarea,select")?.focus(), 80);
 }
@@ -889,7 +905,7 @@ function openReservationModal(res=null){
 function openDocumentModal(doc=null){
   const d = doc || { id: uid(), title:"", category:"Documento", status:"Pendente", dayId:"", link:"", notes:"", file:null, driveFileId:"", uploadStatus:"" };
   const cloudNote = cloudConfigured()
-    ? "Ao escolher um arquivo, a Central tentará enviar automaticamente para a pasta do Google Drive configurada."
+    ? "Escolha o arquivo e clique em \"Salvar e enviar ao Drive\". A Central envia para a pasta configurada e preenche o link automaticamente."
     : "Sem nuvem configurada, o arquivo fica salvo apenas neste navegador. Configure Google Sheets/Drive para salvar online.";
   openModal(doc ? "Editar documento / anexo" : "Novo documento / anexo", `<div class="form-grid">
     <div class="full modal-helper success-soft"><strong>Envio automático para o Drive</strong><br>${escapeHtml(cloudNote)}</div>
@@ -901,12 +917,14 @@ function openDocumentModal(doc=null){
     <div class="full"><label>Arquivo para anexar
       <input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx" />
     </label>
+    <div id="driveUploadPreview" class="file-chip preview"><span>Nenhum arquivo novo selecionado.</span></div>
     ${d.driveFileId ? `<div class="file-chip ok"><span>☁️ Já salvo no Google Drive</span>${d.link ? `<a class="ghost tiny" href="${escapeAttr(d.link)}" target="_blank" rel="noopener">Abrir</a>` : ""}</div>` : ""}
     ${d.file ? `<div class="file-chip"><span>Arquivo atual: ${escapeHtml(d.file.name)} · ${fileSize(d.file.size)}</span></div>` : ""}
-    <p class="muted">Arquivos até 8 MB são enviados automaticamente ao Drive quando a nuvem está configurada.</p></div>
+    <p class="muted">Arquivos até 8 MB são enviados automaticamente ao Drive. Para arquivos maiores, suba direto no Drive e cole o link.</p></div>
     <div class="full">${textarea("notes", "Observações", d.notes)}</div>
-  </div>`, async (fd, form) => {
+  </div>`, async (fd, form, modalApi={}) => {
     const fileInput = form.querySelector('input[name="file"]');
+    const preview = form.querySelector('#driveUploadPreview');
     const file = fileInput?.files?.[0];
     const payload = {
       id:d.id,
@@ -922,25 +940,49 @@ function openDocumentModal(doc=null){
     };
     if(file){
       if(file.size > 8 * 1024 * 1024){
-        alert("Para manter a sincronização estável, envie arquivos de até 8 MB. Para arquivos maiores, suba manualmente no Drive e cole o link.");
+        showToast("Arquivo acima de 8 MB. Suba no Drive e cole o link aqui.");
+        const preview = form.querySelector('#driveUploadPreview');
+        if(preview) preview.innerHTML = `<span>⚠️ ${escapeHtml(file.name)} · ${fileSize(file.size)} · acima de 8 MB</span>`;
         return;
       }
+      modalApi.setSubmitText?.("Lendo arquivo...");
+      if(preview) preview.innerHTML = `<span>⏳ Lendo ${escapeHtml(file.name)}...</span>`;
+      showToast("Preparando arquivo para envio ao Drive...");
       payload.file = await readFileAsDataUrl(file);
       payload.driveFileId = "";
-      payload.uploadStatus = cloudConfigured() ? "pendingDrive" : "localOnly";
+      payload.uploadStatus = cloudConfigured() ? "uploadingDrive" : "localOnly";
+      if(preview) preview.innerHTML = `<span>✅ ${escapeHtml(file.name)} lido. Preparando envio...</span>`;
     }
     if(doc) Object.assign(doc, payload); else data.documents.push(payload);
     const targetId = payload.id;
     closeModal();
     saveData();
     renderAll();
-    showToast(file && cloudConfigured() ? "Documento salvo. Enviando arquivo ao Drive..." : "Documento salvo");
     if(file && cloudConfigured()){
+      modalApi.setSubmitText?.("Enviando ao Drive...");
+      showToast("Enviando arquivo ao Google Drive. Aguarde...");
       await uploadDocumentToDrive(targetId, { auto:true });
     }else{
+      showToast(file ? "Documento salvo apenas neste navegador" : "Documento salvo");
       scheduleCloudSave();
     }
-  });
+  }, cloudConfigured() ? "Salvar e enviar ao Drive" : "Salvar documento");
+
+  setTimeout(() => {
+    const form = byId("modalForm");
+    const fileInput = form?.querySelector('input[name="file"]');
+    const preview = form?.querySelector('#driveUploadPreview');
+    if(!fileInput || !preview) return;
+    fileInput.onchange = () => {
+      const file = fileInput.files?.[0];
+      if(!file){ preview.innerHTML = `<span>Nenhum arquivo novo selecionado.</span>`; return; }
+      const isLarge = file.size > 8 * 1024 * 1024;
+      preview.innerHTML = `<span>${isLarge ? "⚠️" : "✅"} ${escapeHtml(file.name)} · ${fileSize(file.size)} · ${isLarge ? "acima de 8 MB, use link do Drive" : (cloudConfigured() ? "pronto para enviar ao Drive ao salvar" : "será salvo localmente")}</span>`;
+      const submit = byId("modalSubmit");
+      if(submit && !isLarge) submit.textContent = cloudConfigured() ? "Salvar e enviar ao Drive" : "Salvar documento";
+      showToast(isLarge ? "Arquivo grande demais para envio automático." : "Arquivo selecionado. Clique em Salvar e enviar ao Drive.");
+    };
+  }, 80);
 }
 function readFileAsDataUrl(file){
   return new Promise((resolve, reject) => {
@@ -1783,9 +1825,12 @@ async function cloudRequest(action, payload={}){
   if(!token) throw new Error("Preencha a chave de edição em Configurações.");
 
   // Apps Script não libera CORS de forma confiável para fetch comum no GitHub Pages.
-  // Para ações de leitura/teste usamos JSONP. Para gravações longas, enviamos via no-cors.
+  // Para ações de leitura/teste usamos JSONP. Para upload, usamos no-cors direto para evitar envio duplicado.
   if(action === "ping" || action === "getAll"){
     return await jsonpCloudRequest(url, action, token, payload);
+  }
+  if(action === "uploadFile"){
+    return await postCloudNoCors(url, action, token, payload);
   }
 
   try{
@@ -1874,6 +1919,9 @@ async function uploadDocumentToDrive(id, options={}){
   const doc = data.documents.find(d => d.id === id);
   if(!doc || !doc.file || !doc.file.dataUrl){ showToast("Este documento não tem arquivo local para enviar."); return; }
   try{
+    doc.uploadStatus = "uploadingDrive";
+    saveData();
+    renderAll();
     if(!options.silent) showToast("Enviando arquivo ao Google Drive...");
     const base64 = String(doc.file.dataUrl).split(",")[1] || "";
     const payload = {
@@ -1909,8 +1957,9 @@ async function uploadDocumentToDrive(id, options={}){
     doc.uploadStatus = "pendingDrive";
     saveData();
     renderAll();
-    showToast("Arquivo enviado para processamento no Drive. Vou tentar atualizar o link em alguns segundos.");
+    showToast("Envio solicitado ao Drive. Buscando o link na nuvem em alguns segundos...");
     setTimeout(() => refreshFromCloudSilently("drive-upload"), 4500);
+    setTimeout(() => refreshFromCloudSilently("drive-upload"), 11000);
   }catch(err){
     doc.uploadStatus = "uploadError";
     saveData();

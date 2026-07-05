@@ -1,30 +1,18 @@
-# Central de Viagem — v7.3 Upload automático para Drive
+# Central de Viagem — v7.5 Upload com confirmação visual
 
-Versão focada em melhorar documentos/anexos.
+Versão focada em deixar o envio de documentos para o Google Drive mais transparente.
 
 ## O que mudou
 
-- Ao anexar um arquivo em **Documentos**, a Central tenta enviar automaticamente para a pasta do Google Drive configurada.
-- O link do Drive passa a ser preenchido automaticamente no documento, sem precisar colar manualmente.
-- Se o navegador bloquear a leitura da resposta por CORS, o Apps Script atualiza o backup da planilha e a Central tenta recuperar o link alguns segundos depois.
-- O botão manual virou **Reenviar ao Drive**, usado apenas se algum envio falhar.
-- A tela do documento explica quando o arquivo está local, em processamento ou salvo no Drive.
+- O botão do modal mostra `Salvar e enviar ao Drive` quando a nuvem está configurada.
+- Ao clicar em salvar, o botão muda para `Processando...`, `Lendo arquivo...` e `Enviando ao Drive...`.
+- O upload usa envio direto ao Apps Script para evitar duplicidade causada por CORS.
+- Após o envio, a Central busca automaticamente o link salvo no Google Sheets.
+- Se o link ainda não voltar imediatamente, o documento fica marcado como envio solicitado.
+- Mantém a integração Google Sheets / Apps Script / Drive já validada.
 
 ## Importante
 
-Para esta versão funcionar completamente, atualize também o Apps Script:
+Depois de subir esta versão no GitHub, use Ctrl+F5 no navegador.
 
-1. Abra sua planilha.
-2. Vá em **Extensões → Apps Script**.
-3. Substitua o conteúdo de `Código.gs` pelo arquivo `google-apps-script/Code.gs` desta versão.
-4. Confirme a chave:
-
-```js
-const API_KEY = 'mendoza-2026-elton-familia';
-```
-
-5. Clique em **Salvar**.
-6. Vá em **Implantar → Gerenciar implantações → Editar**.
-7. Escolha **Nova versão** e clique em **Implantar**.
-
-A integração Google Sheets/Drive já configurada continua a mesma.
+O Apps Script deve estar com o Code.gs da v7.3/v7.4 e a API_KEY correta.

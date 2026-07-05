@@ -1,22 +1,18 @@
-# Central de Viagem — v6.6 Refinamento Desktop
+# Central de Viagem — v6.7 Ajuste fino desktop + mapa estável
 
-Versão baseada na v6.5, mantendo a integração já validada com Google Sheets/Apps Script, mas com ajustes de layout para desktop.
+Versão criada para testar os refinamentos pós-integração:
 
-## O que mudou
+- mantém a integração Google Sheets/Apps Script já validada;
+- melhora a estabilidade do mapa no desktop;
+- troca o marcador padrão quebrado do Leaflet por marcadores CSS próprios;
+- reduz o efeito de mapa piscando/recalculando a cada renderização;
+- mantém o refino visual desktop da v6.6;
+- preserva a tela de configurações simples da v6.3/v6.4.
 
-- Topo/hero mais compacto no computador.
-- Cards de resumo mais baixos e com cara de dashboard.
-- Sidebar mais estreita e mais enxuta.
-- Dias da viagem na sidebar agora mostram data e cidade/região.
-- Roteiro passa a exibir a numeração em ordem cronológica visual.
-- Mapa com área mais proporcional ao desktop.
-- Redução de espaçamentos verticais exagerados.
-- Mapa com recálculo menos agressivo para reduzir piscadas.
-- Mantida a tela de configurações simples da v6.3/v6.4.
-- Mantido o cadastro fluido de lugares da v6.5.
+## Como subir no GitHub
 
-## Importante
+Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
 
-Se a integração com Google Sheets já funcionou, não é necessário recriar a planilha nem refazer o Apps Script. Basta subir esta versão no GitHub substituindo os arquivos atuais.
+## Apps Script
 
-Depois de publicar no GitHub Pages, use Ctrl+F5 no navegador para evitar cache antigo.
+Não precisa refazer a integração se a conexão já estava OK. Só atualize o Apps Script novamente se você quiser substituir o backend pelo arquivo incluído em `google-apps-script/Code.gs`.

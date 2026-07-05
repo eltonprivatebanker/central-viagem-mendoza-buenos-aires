@@ -399,3 +399,65 @@ a{color:var(--gold-2);text-decoration:none}.app-shell{display:grid;grid-template
   .map{height:clamp(390px,48vh,500px);min-height:390px;}
   .view{padding:16px;}
 }
+
+
+/* ===== v6.7 — mapa estável, sem texto Marker e com marcadores próprios ===== */
+.map.map-stable-v67{
+  background:#dbe8ef;
+  overflow:hidden;
+  transform:translateZ(0);
+  isolation:isolate;
+}
+.map.map-stable-v67 .leaflet-marker-icon,
+.map.map-stable-v67 .leaflet-marker-shadow{
+  background:transparent!important;
+  border:0!important;
+}
+.travel-div-marker{
+  background:transparent!important;
+  border:0!important;
+  color:transparent!important;
+  font-size:0!important;
+}
+.travel-map-marker{
+  width:30px;
+  height:30px;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:linear-gradient(145deg,#ffd98d,#f0bc57);
+  color:#08111f;
+  font-size:12px;
+  line-height:1;
+  font-weight:950;
+  border:2px solid rgba(8,17,31,.92);
+  box-shadow:0 8px 20px rgba(0,0,0,.35), 0 0 0 3px rgba(243,197,108,.22);
+  cursor:pointer;
+}
+.travel-map-marker.planned{background:linear-gradient(145deg,#8db8ff,#5d8df2);color:#061326;box-shadow:0 8px 20px rgba(0,0,0,.35),0 0 0 3px rgba(141,184,255,.22);}
+.travel-map-marker.booked{background:linear-gradient(145deg,#77e7b5,#36bd83);color:#061326;box-shadow:0 8px 20px rgba(0,0,0,.35),0 0 0 3px rgba(119,231,181,.22);}
+.travel-map-marker.done{background:linear-gradient(145deg,#d8e6ff,#8db8ff);color:#061326;}
+.travel-map-marker.wishlist{background:linear-gradient(145deg,#ffd98d,#f0bc57);color:#07111f;}
+.map .leaflet-popup-content button{
+  margin-top:8px;
+  border:1px solid rgba(243,197,108,.35);
+  border-radius:999px;
+  background:rgba(243,197,108,.12);
+  color:#ffd98d;
+  font-weight:900;
+  padding:7px 10px;
+}
+.map .leaflet-tile-container,
+.map .leaflet-tile{
+  will-change:auto!important;
+}
+.map.map-loading::after{
+  opacity:.85;
+}
+@media (min-width:1181px){
+  .map-panel{align-self:start;}
+  .map{height:clamp(460px,52vh,600px);min-height:460px;}
+  .selected-place .card{max-height:180px;overflow:auto;}
+  .overview-box{max-height:none;}
+  .task-list{max-height:none;}
+}

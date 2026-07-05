@@ -1,4 +1,4 @@
-/* Central de Viagem v6.5 — cadastro fluido, cidades pré-validadas e mapa estável
+/* Central de Viagem v6.7 — refino desktop, mapa estável e marcadores CSS
    GitHub Pages continua como interface. Google Apps Script pode virar backend gratuito. */
 const STORAGE_KEY = "centralViagemV5Completo"; // mantido para migrar dados locais da v5/v5.1
 const uid = () => `${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36).slice(-5)}`;
@@ -1987,4 +1987,161 @@ function forceMapRefresh(reason = ""){
       map.invalidateSize({ pan:false, debounceMoveend:true });
     }catch(err){ console.warn("Falha ao recalcular mapa", reason, err); }
   }, 420);
+}
+
+
+/* ===== v6.7 — ajuste fino desktop + mapa estável =====
+   Objetivos:
+   - parar o efeito de mapa piscando/recarregando em excesso;
+   - trocar o ícone padrão quebrado do Leaflet por marcador CSS próprio;
+   - remover o texto/alt "Marker" visualmente;
+   - atualizar só marcadores quando os lugares mudarem;
+   - preservar a integração Google Sheets já validada.
+*/
+let mapLastSizeKeyV67 = "";
+let mapFitPendingV67 = false;
+let mapInitDoneV67 = false;
+
+function forceMapRefresh(reason = ""){
+  if(!map) return;
+  clearTimeout(mapRefreshTimer);
+  mapRefreshTimer = setTimeout(() => {
+    try{
+      const el = byId("map");
+      if(!el) return;
+      const sizeKey = `${el.clientWidth}x${el.clientHeight}`;
+      const mustRefresh = !mapLastSizeKeyV67 || sizeKey !== mapLastSizeKeyV67 || /manual|init|reload|fit|visibility/i.test(reason);
+      if(!mustRefresh) return;
+      mapLastSizeKeyV67 = sizeKey;
+      map.invalidateSize({ pan:false, debounceMoveend:true });
+    }catch(err){
+      console.warn("Falha ao recalcular mapa", reason, err);
+    }
+  }, 520);
+}
+
+function travelMarkerIcon(place, idx){
+  const status = (place.status || "wishlist").toString();
+  const statusClass = status === "planned" ? "planned" : status === "booked" ? "booked" : status === "done" ? "done" : "wishlist";
+  const safeName = escapeAttr(place.name || "Lugar");
+  return L.divIcon({
+    className: "travel-div-marker",
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -16],
+    html: `<span class="travel-map-marker ${statusClass}" title="${safeName}" aria-label="${safeName}">${idx + 1}</span>`
+  });
+}
+
+function initMap(){
+  const fallback = byId("mapFallback");
+  const mapEl = byId("map");
+  if(!mapEl) return;
+  if(!window.L){
+    if(fallback) fallback.hidden = false;
+    return;
+  }
+  if(map){
+    forceMapRefresh("init-existing");
+    renderMapMarkers();
+    return;
+  }
+  try{
+    if(fallback) fallback.hidden = true;
+    mapEl.classList.add("map-stable-v67", "map-loading");
+    map = L.map("map", {
+      zoomControl:true,
+      scrollWheelZoom:false,
+      worldCopyJump:false,
+      preferCanvas:false,
+      fadeAnimation:false,
+      zoomAnimation:true,
+      markerZoomAnimation:false
+    }).setView(DEFAULT_MAP_CENTER, 4);
+
+    mapTileLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom:18,
+      minZoom:2,
+      tileSize:256,
+      zoomOffset:0,
+      detectRetina:false,
+      updateWhenIdle:true,
+      updateWhenZooming:false,
+      keepBuffer:3,
+      crossOrigin:false,
+      attribution:'&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    mapTileLayer.on("load", () => {
+      mapEl.classList.remove("map-loading");
+      if(fallback) fallback.hidden = true;
+    });
+    mapTileLayer.on("tileerror", () => {
+      mapEl.classList.add("map-has-tile-error");
+    });
+
+    markersLayer = L.layerGroup().addTo(map);
+    map.on("click", event => {
+      if(currentView === "places"){
+        const { lat, lng } = event.latlng;
+        openPlaceModal(null, { lat, lng });
+      }
+    });
+
+    if("ResizeObserver" in window){
+      mapResizeObserver?.disconnect();
+      mapResizeObserver = new ResizeObserver(() => forceMapRefresh("resize-observer"));
+      mapResizeObserver.observe(mapEl);
+    }
+    window.addEventListener("resize", () => forceMapRefresh("window-resize"), { passive:true });
+    document.addEventListener("visibilitychange", () => { if(!document.hidden) forceMapRefresh("visibility"); });
+
+    mapInitDoneV67 = true;
+    setTimeout(() => { forceMapRefresh("init"); renderMapMarkers(); }, 260);
+    setTimeout(() => { fitMap(false); mapHasFittedOnce = true; }, 750);
+  }catch(err){
+    console.warn("Falha ao iniciar mapa", err);
+    if(fallback) fallback.hidden = false;
+  }
+}
+
+function renderMapMarkers(){
+  if(!map || !markersLayer) return;
+  const signature = data.places.map(p => `${p.id}:${p.lat}:${p.lng}:${p.name}:${p.status}:${p.dayId}:${p.period}`).join("|");
+  if(signature === lastMarkerSignature){
+    renderSelectedPlaceBox();
+    return;
+  }
+  lastMarkerSignature = signature;
+  markersLayer.clearLayers();
+  const coords = [];
+  data.places.forEach((place, idx) => {
+    const lat = Number(place.lat), lng = Number(place.lng);
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const marker = L.marker([lat,lng], { icon: travelMarkerIcon(place, idx), keyboard:true, title: place.name || "Lugar" }).addTo(markersLayer);
+    marker.bindPopup(`<strong>${escapeHtml(place.name)}</strong><br>${escapeHtml(place.city || "")} · ${statusLabel(place.status)}<br>${dayLabel(place.dayId)} · ${periodLabel(place.period)}<br>${place.url ? `<a href="${escapeAttr(place.url)}" target="_blank" rel="noopener">Abrir no Google Maps</a><br>` : ""}<button onclick="window.selectPlaceFromPopup('${place.id}')">Selecionar</button>`);
+    marker.on("click", () => selectPlace(place.id, false));
+    coords.push([lat,lng]);
+  });
+  if(!mapHasFittedOnce && coords.length && !mapFitPendingV67){
+    mapFitPendingV67 = true;
+    setTimeout(() => { fitMap(false); mapFitPendingV67 = false; }, 200);
+  }
+  renderSelectedPlaceBox();
+}
+
+function reloadMap(showMessage=true){
+  if(!map){
+    initMap();
+    return;
+  }
+  try{
+    forceMapRefresh("manual-reload");
+    if(mapTileLayer && typeof mapTileLayer.redraw === "function") mapTileLayer.redraw();
+    renderMapMarkers();
+    if(showMessage) showToast("Mapa recalculado");
+  }catch(err){
+    console.warn("Falha ao recarregar mapa", err);
+    if(showMessage) showToast("Não consegui recarregar o mapa agora");
+  }
 }

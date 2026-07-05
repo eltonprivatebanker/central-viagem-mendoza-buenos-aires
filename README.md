@@ -1,20 +1,22 @@
-# Central de Viagem — v7.8 Documentos compactos
+# Central de Viagem — v7.9 Navegação limpa e foco por seção
 
-Versão focada em deixar o modal de documentos/anexos caber melhor na tela do computador, sem precisar rolar para encontrar o botão de salvar.
+Versão focada em reduzir redundâncias, melhorar a hierarquia visual e deixar cada tela com uma função clara.
 
 ## O que mudou
 
-- Modal de documento mais baixo e compacto no desktop.
-- Bloco de upload reduzido, com botão de procurar arquivo visível logo no topo.
-- Status do arquivo e destino do Drive mais discretos.
-- Campos principais reorganizados para ocupar menos altura.
-- Botões de ação ficam visíveis sem precisar rolar em telas normais de notebook/desktop.
-- Mantém upload automático para subpastas do Google Drive da v7.6/v7.7.
-
-## Apps Script
-
-Não há mudança obrigatória em relação à v7.6/v7.7 se o seu `Code.gs` já está com upload em subpastas e `API_KEY` correta.
+- Mapa aparece apenas onde faz sentido: Início, Roteiro e Lugares.
+- A aba Documentos não mostra mais o mapa lateral, ganhando largura total.
+- Documentos agora aparecem organizados por pastas/categorias do Google Drive.
+- Cards compactos mostram quantos arquivos existem em cada subpasta.
+- Lista de arquivos ficou mais enxuta, com ações rápidas: abrir, editar, enviar Drive e excluir.
+- Botões de backup/importação/reset foram removidos da lateral e ficam em Configurações > Avançado e backup.
+- Botões destrutivos ficaram mais discretos.
+- Navegação ficou mais objetiva: Início, Roteiro, Lugares, Reservas, Documentos, Orçamento e Configurações.
 
 ## Como subir
 
-Envie os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5.
+Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
+
+## Apps Script
+
+Não é necessário alterar o Apps Script se ele já estiver na versão com upload para subpastas do Drive e `API_KEY` igual à chave configurada na Central.

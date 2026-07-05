@@ -3554,3 +3554,144 @@ openDocumentModal = function(doc=null){
   }, 80);
 };
 
+
+/* ===== v7.9 — navegação limpa, foco por seção e documentos por pasta ===== */
+const MAP_FOCUSED_VIEWS_V79 = new Set(["overview", "itinerary", "places"]);
+function applyWorkspaceFocusV79(view = currentView){
+  const workspace = document.querySelector(".workspace");
+  if(!workspace) return;
+  const showMap = MAP_FOCUSED_VIEWS_V79.has(view);
+  workspace.classList.toggle("workspace-no-map-v79", !showMap);
+  document.body.classList.toggle("view-documents-v79", view === "documents");
+  document.body.classList.toggle("view-settings-v79", view === "settings");
+  if(showMap) setTimeout(() => forceMapRefresh(`focus-v79-${view}`), 180);
+}
+
+const setViewBaseV79 = setView;
+setView = function(view){
+  setViewBaseV79(view);
+  applyWorkspaceFocusV79(view);
+};
+
+function docFolderDefinitionsV79(){
+  return [
+    { folder:"01 - Documentos pessoais", icon:"🪪", helper:"RG, passaporte e autorizações" },
+    { folder:"02 - Voos e deslocamentos", icon:"✈️", helper:"Voos, bilhetes e localizadores" },
+    { folder:"03 - Hotéis", icon:"🏨", helper:"Reservas e políticas" },
+    { folder:"04 - Carro alugado", icon:"🚗", helper:"Locadora, caução e seguro" },
+    { folder:"05 - Passeios e ingressos", icon:"🎟️", helper:"Vouchers, tours e vinícolas" },
+    { folder:"06 - Seguro viagem", icon:"🛡️", helper:"Apólice e contatos" },
+    { folder:"07 - Orçamento e comprovantes", icon:"💳", helper:"Recibos e pagamentos" },
+    { folder:"08 - Mapas e roteiros", icon:"🗺️", helper:"Mapas, roteiro e outros" }
+  ];
+}
+function docFolderForV79(doc){
+  return doc.driveFolderName || expectedDriveFolderV76(doc);
+}
+function docStatusTextV79(doc){
+  if(doc.driveFileId) return `Salvo no Drive${doc.driveFolderName ? ` · ${doc.driveFolderName}` : ""}`;
+  if(doc.uploadStatus === "uploadingDrive") return `Enviando ao Drive...`;
+  if(doc.uploadStatus === "pendingDrive") return `Envio solicitado · carregar da nuvem em instantes`;
+  if(doc.uploadStatus === "uploadError") return `Erro no envio · tente reenviar`;
+  if(doc.file) return `Arquivo local · falta enviar ao Drive`;
+  if(doc.link) return `Link cadastrado`;
+  return `Pendente`;
+}
+function renderDocuments(){
+  const folders = docFolderDefinitionsV79();
+  const docsByFolder = new Map(folders.map(f => [f.folder, []]));
+  data.documents.forEach(doc => {
+    const folder = docFolderForV79(doc);
+    if(!docsByFolder.has(folder)) docsByFolder.set(folder, []);
+    docsByFolder.get(folder).push(doc);
+  });
+  const totalDocs = data.documents.length;
+  const driveDocs = data.documents.filter(d => d.driveFileId || d.link).length;
+  const pendingDocs = data.documents.filter(d => !d.driveFileId && !d.link).length;
+  byId("documentsList").innerHTML = `<div class="documents-v79">
+    <div class="doc-command-v79">
+      <div>
+        <strong>Documentos organizados por pasta</strong>
+        <span>Escolha a categoria ao anexar. A Central envia para a subpasta correta do Google Drive.</span>
+      </div>
+      <button class="primary" data-new-doc-v79>+ Enviar documento</button>
+    </div>
+
+    <div class="doc-mini-stats-v79">
+      <span><strong>${totalDocs}</strong> cadastrado(s)</span>
+      <span><strong>${driveDocs}</strong> com link/Drive</span>
+      <span><strong>${pendingDocs}</strong> pendente(s)</span>
+    </div>
+
+    <div class="doc-folder-grid-v79">
+      ${folders.map(f => {
+        const count = (docsByFolder.get(f.folder) || []).length;
+        return `<button class="doc-folder-tile-v79" data-doc-folder-jump="${escapeAttr(f.folder)}" type="button">
+          <span class="doc-folder-icon-v79">${f.icon}</span>
+          <strong>${escapeHtml(f.folder)}</strong>
+          <small>${count} arquivo(s) · ${escapeHtml(f.helper)}</small>
+        </button>`;
+      }).join("")}
+    </div>
+
+    <div class="doc-list-head-v79">
+      <h3>Arquivos cadastrados</h3>
+      <button class="secondary tiny" data-new-doc-v79>+ Documento</button>
+    </div>
+
+    <div class="doc-list-v79">
+      ${data.documents.length ? data.documents.map(doc => {
+        const folder = docFolderForV79(doc);
+        return `<article class="doc-row-v79" data-doc-row-folder="${escapeAttr(folder)}">
+          <div class="doc-row-main-v79">
+            <strong>${escapeHtml(doc.title || doc.file?.name || "Documento da viagem")}</strong>
+            <small>${escapeHtml(folder)} · ${escapeHtml(dayLabel(doc.dayId))}</small>
+            <span>${escapeHtml(docStatusTextV79(doc))}</span>
+          </div>
+          <div class="doc-row-tags-v79">
+            <span class="tag blue">${escapeHtml(doc.category || "Documento")}</span>
+            <span class="tag ${doc.status === "Concluído" ? "ok" : "pending"}">${escapeHtml(doc.status || "Pendente")}</span>
+          </div>
+          <div class="doc-row-actions-v79">
+            ${doc.link ? `<a class="ghost tiny" href="${escapeAttr(doc.link)}" target="_blank" rel="noopener">Abrir</a>` : ""}
+            <button class="ghost tiny" data-edit-doc="${doc.id}">Editar</button>
+            ${doc.file && doc.file.dataUrl && cloudConfigured() && !doc.driveFileId ? `<button class="ghost tiny" data-upload-drive="${doc.id}">Enviar Drive</button>` : ""}
+            ${doc.file && doc.file.dataUrl ? `<button class="ghost tiny" data-download-doc="${doc.id}">Baixar local</button>` : ""}
+            <button class="ghost tiny danger" data-delete-doc="${doc.id}">Excluir</button>
+          </div>
+        </article>`;
+      }).join("") : `<div class="empty-state">Nenhum documento cadastrado. Clique em + Documento para enviar o primeiro arquivo.</div>`}
+    </div>
+  </div>`;
+
+  document.querySelectorAll("[data-new-doc-v79]").forEach(el => el.onclick = () => openDocumentModal());
+  document.querySelectorAll("[data-doc-folder-jump]").forEach(el => el.onclick = () => {
+    const folder = el.dataset.docFolderJump;
+    const target = document.querySelector(`[data-doc-row-folder="${CSS.escape(folder)}"]`);
+    if(target){ target.scrollIntoView({ behavior:"smooth", block:"center" }); target.classList.add("pulse-v79"); setTimeout(() => target.classList.remove("pulse-v79"), 900); }
+    else showToast("Ainda não há arquivos nessa pasta");
+  });
+  document.querySelectorAll("[data-edit-doc]").forEach(el => el.onclick = () => openDocumentModal(data.documents.find(d => d.id === el.dataset.editDoc)));
+  document.querySelectorAll("[data-delete-doc]").forEach(el => el.onclick = () => deleteItem("documents", el.dataset.deleteDoc, "Excluir documento?"));
+  document.querySelectorAll("[data-remove-file]").forEach(el => el.onclick = () => removeDocumentFile(el.dataset.removeFile));
+  document.querySelectorAll("[data-download-doc]").forEach(el => el.onclick = () => downloadDocumentFile(el.dataset.downloadDoc));
+  document.querySelectorAll("[data-upload-drive]").forEach(el => el.onclick = () => uploadDocumentToDrive(el.dataset.uploadDrive));
+}
+
+const renderSettingsBaseV79 = renderSettings;
+renderSettings = function(){
+  renderSettingsBaseV79();
+  const advanced = document.querySelector("#settingsPanel details.compact-details:last-child .card-actions");
+  if(advanced && !advanced.querySelector("[data-reset-local-v79]")){
+    advanced.insertAdjacentHTML("beforeend", `<button class="secondary danger" data-reset-local-v79>Resetar dados locais</button>`);
+    advanced.querySelector("[data-reset-local-v79]").onclick = resetLocalData;
+  }
+};
+
+const renderAllBaseV79 = renderAll;
+renderAll = function(){
+  renderAllBaseV79();
+  applyWorkspaceFocusV79(currentView);
+};
+
+setTimeout(() => applyWorkspaceFocusV79(currentView), 0);

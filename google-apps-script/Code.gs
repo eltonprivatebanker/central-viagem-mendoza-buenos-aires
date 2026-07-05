@@ -1,7 +1,7 @@
 
 /**
  * Central de Viagem — Backend Google Sheets + Drive + Agenda
- * Versão v7.4 — JSONP/CORS + upload automático no Drive
+ * Versão v7.6 — JSONP/CORS + upload automático em subpastas do Drive
  *
  * Como usar:
  * 1) Crie uma Planilha Google chamada "Central de Viagem".
@@ -13,7 +13,7 @@
  * 7) Copie a URL /exec e cole na Central de Viagem, junto com a mesma API_KEY.
  */
 
-const API_KEY = 'troque-esta-chave-familiar';
+const API_KEY = 'mendoza-2026-elton-familia';
 const CALENDAR_ID = ''; // Opcional: abc123@group.calendar.google.com. Vazio usa agenda padrão.
 const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
 const JSON_CHUNK_SIZE = 40000;
@@ -67,7 +67,7 @@ function setupCentralViagem(initialData) {
   ensureSheet_(SHEETS.days, ['id','numero','label','data','titulo','cidade','manha','tarde','noite','hospedagem','deslocamento','observacoes']);
   ensureSheet_(SHEETS.places, ['id','nome','cidade','categoria','status','prioridade','dia_id','periodo','latitude','longitude','link_maps','localizacao','inicio','fim','observacoes']);
   ensureSheet_(SHEETS.reservations, ['id','tipo','titulo','status','cidade','data','hora_inicio','hora_fim','data_fim','valor','pago','dia_id','link','localizacao','observacoes']);
-  ensureSheet_(SHEETS.documents, ['id','titulo','categoria','status','dia_id','link','drive_file_id','arquivo_nome','arquivo_tamanho','observacoes']);
+  ensureSheet_(SHEETS.documents, ['id','titulo','categoria','status','dia_id','link','drive_file_id','drive_pasta','arquivo_nome','arquivo_tamanho','observacoes']);
   ensureSheet_(SHEETS.expenses, ['id','categoria','titulo','cidade','data','previsto','pago','status','pessoa','observacoes']);
   ensureSheet_(SHEETS.tasks, ['id','titulo','descricao','critico','concluido']);
   ensureSheet_(SHEETS.snapshot, ['parte','json']);
@@ -125,11 +125,22 @@ function createCalendarEvent_(event, settings, trip) {
 function uploadFile_(payload) {
   if (!payload || !payload.base64 || !payload.fileName) throw new Error('Arquivo inválido.');
   const folderId = payload.folderId || readConfig_('drive_folder_id_frontend') || '';
-  const folder = folderId ? DriveApp.getFolderById(folderId) : DriveApp.getRootFolder();
+  const rootFolder = folderId ? DriveApp.getFolderById(folderId) : DriveApp.getRootFolder();
+  const targetFolder = getUploadTargetFolder_(rootFolder, payload);
   const bytes = Utilities.base64Decode(payload.base64);
   const blob = Utilities.newBlob(bytes, payload.mimeType || 'application/octet-stream', payload.fileName);
-  const file = folder.createFile(blob);
-  const result = { ok: true, message: 'Arquivo enviado ao Google Drive', fileId: file.getId(), fileUrl: file.getUrl(), name: file.getName() };
+  const file = targetFolder.createFile(blob);
+  const folderName = targetFolder.getName();
+  const result = {
+    ok: true,
+    message: 'Arquivo enviado ao Google Drive em: ' + folderName,
+    fileId: file.getId(),
+    fileUrl: file.getUrl(),
+    name: file.getName(),
+    folderId: targetFolder.getId(),
+    folderName: folderName,
+    folderUrl: targetFolder.getUrl()
+  };
 
   // Atualiza automaticamente o documento dentro do backup JSON da viagem.
   // Assim, mesmo quando o navegador envia por no-cors e não consegue ler a resposta,
@@ -145,6 +156,9 @@ function uploadFile_(payload) {
       }
       doc.driveFileId = file.getId();
       doc.link = file.getUrl();
+      doc.driveFolderId = targetFolder.getId();
+      doc.driveFolderName = folderName;
+      doc.driveFolderUrl = targetFolder.getUrl();
       doc.uploadStatus = 'uploadedDrive';
       doc.file = { name: file.getName(), size: bytes.length, type: payload.mimeType || 'application/octet-stream', localOnly: false };
       writeJsonSnapshot_(data);
@@ -154,8 +168,52 @@ function uploadFile_(payload) {
     log_('uploadFile_snapshot_warning', err.message || String(err));
   }
 
-  log_('uploadFile', payload.fileName);
+  log_('uploadFile', payload.fileName + ' → ' + folderName);
   return result;
+}
+
+function getUploadTargetFolder_(rootFolder, payload) {
+  const folderName = resolveDocumentFolderName_(payload);
+  if (!folderName) return rootFolder;
+  const found = rootFolder.getFoldersByName(folderName);
+  if (found.hasNext()) return found.next();
+  return rootFolder.createFolder(folderName);
+}
+
+function resolveDocumentFolderName_(payload) {
+  const doc = payload.documentData || {};
+  const combined = normalizeText_([
+    doc.category,
+    payload.category,
+    doc.title,
+    payload.fileName,
+    doc.notes
+  ].filter(Boolean).join(' '));
+
+  if (/(rg|cpf|passaporte|documento pessoal|documentos pessoais|autorizacao|autorização|menor)/.test(combined)) return '01 - Documentos pessoais';
+  if (/(voo|voos|bilhete|passagem|boarding|checkin|check-in|desloc|onibus|ônibus|trem|aereo|aéreo|aeroporto|localizador)/.test(combined)) return '02 - Voos e deslocamentos';
+  if (/(hotel|hoteis|hotéis|hospedagem|reserva hotel|airbnb|booking)/.test(combined)) return '03 - Hotéis';
+  if (/(carro|aluguel|alugado|locadora|rent.?a.?car|caucao|caução)/.test(combined)) return '04 - Carro alugado';
+  if (/(passeio|ingresso|ticket|voucher|vinicola|vinícola|parque|tour|atração|atracao)/.test(combined)) return '05 - Passeios e ingressos';
+  if (/(seguro|apolice|apólice|assistencia|assistência)/.test(combined)) return '06 - Seguro viagem';
+  if (/(orcamento|orçamento|comprovante|pagamento|recibo|transaccion|transação|transacao|pix|cartao|cartão|cambio|câmbio)/.test(combined)) return '07 - Orçamento e comprovantes';
+  if (/(mapa|roteiro|itinerario|itinerário|agenda|programacao|programação)/.test(combined)) return '08 - Mapas e roteiros';
+
+  const cat = normalizeText_(doc.category || payload.category || '');
+  if (cat.includes('documentos pessoais')) return '01 - Documentos pessoais';
+  if (cat.includes('desloc')) return '02 - Voos e deslocamentos';
+  if (cat.includes('hosped')) return '03 - Hotéis';
+  if (cat.includes('passe')) return '05 - Passeios e ingressos';
+  if (cat.includes('seguro')) return '06 - Seguro viagem';
+  if (cat.includes('orc') || cat.includes('comprovante')) return '07 - Orçamento e comprovantes';
+  return '08 - Mapas e roteiros';
+}
+
+function normalizeText_(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 function setupSheetsOnly_() {
@@ -163,7 +221,7 @@ function setupSheetsOnly_() {
   ensureSheet_(SHEETS.days, ['id','numero','label','data','titulo','cidade','manha','tarde','noite','hospedagem','deslocamento','observacoes']);
   ensureSheet_(SHEETS.places, ['id','nome','cidade','categoria','status','prioridade','dia_id','periodo','latitude','longitude','link_maps','localizacao','inicio','fim','observacoes']);
   ensureSheet_(SHEETS.reservations, ['id','tipo','titulo','status','cidade','data','hora_inicio','hora_fim','data_fim','valor','pago','dia_id','link','localizacao','observacoes']);
-  ensureSheet_(SHEETS.documents, ['id','titulo','categoria','status','dia_id','link','drive_file_id','arquivo_nome','arquivo_tamanho','observacoes']);
+  ensureSheet_(SHEETS.documents, ['id','titulo','categoria','status','dia_id','link','drive_file_id','drive_pasta','arquivo_nome','arquivo_tamanho','observacoes']);
   ensureSheet_(SHEETS.expenses, ['id','categoria','titulo','cidade','data','previsto','pago','status','pessoa','observacoes']);
   ensureSheet_(SHEETS.tasks, ['id','titulo','descricao','critico','concluido']);
   ensureSheet_(SHEETS.snapshot, ['parte','json']);
@@ -197,7 +255,7 @@ function writeReadableTables_(data) {
   clearAndWrite_(SHEETS.days, ['id','numero','label','data','titulo','cidade','manha','tarde','noite','hospedagem','deslocamento','observacoes'], (data.days || []).map(d => [d.id,d.number,d.label,d.date,d.title,d.city,d.morning,d.afternoon,d.night,d.lodging,d.transport,d.notes]));
   clearAndWrite_(SHEETS.places, ['id','nome','cidade','categoria','status','prioridade','dia_id','periodo','latitude','longitude','link_maps','localizacao','inicio','fim','observacoes'], (data.places || []).map(p => [p.id,p.name,p.city,p.category,p.status,p.priority,p.dayId,p.period,p.lat,p.lng,p.url,p.location,p.startTime,p.endTime,p.notes]));
   clearAndWrite_(SHEETS.reservations, ['id','tipo','titulo','status','cidade','data','hora_inicio','hora_fim','data_fim','valor','pago','dia_id','link','localizacao','observacoes'], (data.reservations || []).map(r => [r.id,r.type,r.title,r.status,r.city,r.date,r.time,r.endTime,r.endDate,r.amount,r.paid,r.dayId,r.link,r.location,r.notes]));
-  clearAndWrite_(SHEETS.documents, ['id','titulo','categoria','status','dia_id','link','drive_file_id','arquivo_nome','arquivo_tamanho','observacoes'], (data.documents || []).map(d => [d.id,d.title,d.category,d.status,d.dayId,d.link,d.driveFileId || '',d.file ? d.file.name : '',d.file ? d.file.size : '',d.notes]));
+  clearAndWrite_(SHEETS.documents, ['id','titulo','categoria','status','dia_id','link','drive_file_id','drive_pasta','arquivo_nome','arquivo_tamanho','observacoes'], (data.documents || []).map(d => [d.id,d.title,d.category,d.status,d.dayId,d.link,d.driveFileId || '',d.driveFolderName || '',d.file ? d.file.name : '',d.file ? d.file.size : '',d.notes]));
   clearAndWrite_(SHEETS.expenses, ['id','categoria','titulo','cidade','data','previsto','pago','status','pessoa','observacoes'], (data.expenses || []).map(e => [e.id,e.category,e.title,e.city,e.date,e.expected,e.paid,e.status,e.person,e.notes]));
   clearAndWrite_(SHEETS.tasks, ['id','titulo','descricao','critico','concluido'], (data.tasks || []).map(t => [t.id,t.title,t.description,Boolean(t.critical),Boolean(t.done)]));
 }

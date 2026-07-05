@@ -3205,3 +3205,213 @@ renderAll = function(){
   renderAllBaseV72();
   enhanceMetricCardsV72();
 };
+
+/* ===== v7.6 — upload em subpastas do Google Drive por categoria ===== */
+const DOC_FOLDER_MAP_V76 = [
+  { folder:"01 - Documentos pessoais", re:/(rg|cpf|passaporte|documento pessoal|documentos pessoais|autorizacao|autorização|menor)/i, cats:["Documentos pessoais"] },
+  { folder:"02 - Voos e deslocamentos", re:/(voo|voos|bilhete|passagem|boarding|checkin|check-in|desloc|ônibus|onibus|trem|a[eé]reo|aeroporto|localizador)/i, cats:["Deslocamentos"] },
+  { folder:"03 - Hotéis", re:/(hotel|hot[eé]is|hospedagem|airbnb|booking)/i, cats:["Hospedagem"] },
+  { folder:"04 - Carro alugado", re:/(carro|aluguel|alugado|locadora|rent.?a.?car|cau[cç][aã]o)/i, cats:["Carro"] },
+  { folder:"05 - Passeios e ingressos", re:/(passeio|ingresso|ticket|voucher|vin[ií]cola|parque|tour|atra[cç][aã]o)/i, cats:["Passeios"] },
+  { folder:"06 - Seguro viagem", re:/(seguro|ap[oó]lice|assist[eê]ncia)/i, cats:["Seguro"] },
+  { folder:"07 - Orçamento e comprovantes", re:/(or[cç]amento|comprovante|pagamento|recibo|transaccion|transa[cç][aã]o|pix|cart[aã]o|c[aâ]mbio)/i, cats:["Orçamento","Comprovante"] },
+  { folder:"08 - Mapas e roteiros", re:/(mapa|roteiro|itiner[aá]rio|agenda|programa[cç][aã]o)/i, cats:["Mapa","Roteiro","Outro"] }
+];
+function expectedDriveFolderV76(doc={}){
+  const category = String(doc.category || "");
+  const text = [doc.category, doc.title, doc.file?.name, doc.notes].filter(Boolean).join(" ");
+  const byCat = DOC_FOLDER_MAP_V76.find(x => (x.cats || []).some(c => normalizeForSearchV72(c) === normalizeForSearchV72(category)));
+  if(byCat) return byCat.folder;
+  const byText = DOC_FOLDER_MAP_V76.find(x => x.re.test(text));
+  return byText ? byText.folder : "08 - Mapas e roteiros";
+}
+function folderHintV76(doc={}){
+  return expectedDriveFolderV76(doc);
+}
+function renderDocuments(){
+  byId("documentsList").innerHTML = data.documents.map(doc => {
+    const folder = doc.driveFolderName || expectedDriveFolderV76(doc);
+    return `<article class="card">
+      <h3>${escapeHtml(doc.title)}</h3>
+      <div class="card-meta">
+        <span class="tag blue">${escapeHtml(doc.category || "Documento")}</span>
+        <span class="tag ${doc.status === "Concluído" ? "ok" : "pending"}">${escapeHtml(doc.status || "Pendente")}</span>
+      </div>
+      <p>${escapeHtml(doc.notes || "Sem observações.")}</p>
+      <p class="muted"><strong>Dia:</strong> ${dayLabel(doc.dayId)}<br><strong>Pasta Drive:</strong> ${escapeHtml(folder)}</p>
+      ${doc.file ? `<div class="file-chip"><span>📎 ${escapeHtml(doc.file.name)} · ${fileSize(doc.file.size)}</span>${doc.file.dataUrl ? `<button class="ghost tiny" data-download-doc="${doc.id}">Baixar local</button>` : ""}</div>` : ""}
+      ${doc.driveFileId ? `<p class="muted"><strong>Drive:</strong> salvo em ${escapeHtml(doc.driveFolderName || folder)}.</p>` : doc.uploadStatus === "uploadingDrive" ? `<p class="muted"><strong>Drive:</strong> enviando para ${escapeHtml(folder)}. Aguarde a confirmação.</p>` : doc.uploadStatus === "pendingDrive" ? `<p class="muted"><strong>Drive:</strong> envio solicitado para ${escapeHtml(folder)}. Clique em “Carregar da nuvem” em alguns segundos se o link ainda não aparecer.</p>` : doc.uploadStatus === "uploadError" ? `<p class="muted"><strong>Drive:</strong> não consegui confirmar o envio. Use “Reenviar ao Drive” ou cole o link manualmente.</p>` : ""}
+      <div class="card-actions">
+        <button class="ghost tiny" data-edit-doc="${doc.id}">Editar / anexar</button>
+        ${doc.link ? `<a class="ghost tiny" href="${escapeAttr(doc.link)}" target="_blank" rel="noopener">Abrir no Drive/link</a>` : ""}
+        ${doc.file && doc.file.dataUrl && cloudConfigured() && !doc.driveFileId ? `<button class="ghost tiny" data-upload-drive="${doc.id}">Reenviar ao Drive</button>` : ""}
+        ${doc.file && doc.file.dataUrl ? `<button class="ghost tiny danger" data-remove-file="${doc.id}">Remover arquivo local</button>` : ""}
+        <button class="ghost tiny danger" data-delete-doc="${doc.id}">Excluir</button>
+      </div>
+    </article>`;
+  }).join("") || `<div class="empty-state">Nenhum documento cadastrado.</div>`;
+  document.querySelectorAll("[data-edit-doc]").forEach(el => el.onclick = () => openDocumentModal(data.documents.find(d => d.id === el.dataset.editDoc)));
+  document.querySelectorAll("[data-delete-doc]").forEach(el => el.onclick = () => deleteItem("documents", el.dataset.deleteDoc, "Excluir documento?"));
+  document.querySelectorAll("[data-remove-file]").forEach(el => el.onclick = () => removeDocumentFile(el.dataset.removeFile));
+  document.querySelectorAll("[data-download-doc]").forEach(el => el.onclick = () => downloadDocumentFile(el.dataset.downloadDoc));
+  document.querySelectorAll("[data-upload-drive]").forEach(el => el.onclick = () => uploadDocumentToDrive(el.dataset.uploadDrive));
+}
+
+function openDocumentModal(doc=null){
+  const d = doc || { id: uid(), title:"", category:"Documentos pessoais", status:"Pendente", dayId:"", link:"", notes:"", file:null, driveFileId:"", uploadStatus:"", driveFolderName:"" };
+  const cloudNote = cloudConfigured()
+    ? "Escolha o arquivo e clique em \"Salvar e enviar ao Drive\". A Central envia para a subpasta correta conforme a categoria."
+    : "Sem nuvem configurada, o arquivo fica salvo apenas neste navegador. Configure Google Sheets/Drive para salvar online.";
+  const initialFolder = folderHintV76(d);
+  openModal(doc ? "Editar documento / anexo" : "Novo documento / anexo", `<div class="form-grid">
+    <div class="full modal-helper success-soft"><strong>Envio automático para o Drive</strong><br>${escapeHtml(cloudNote)}<br><span id="driveFolderPreviewV76">Destino previsto: ${escapeHtml(initialFolder)}</span></div>
+    <div class="full">${input("title", "Título", d.title, "text", "required")}</div>
+    ${selectInput("category", "Categoria", d.category, ["Documentos pessoais","Seguro","Hospedagem","Deslocamentos","Passeios","Orçamento","Comprovante","Outro"])}
+    ${selectInput("status", "Status", d.status, ["Pendente","Concluído"])}
+    ${selectInput("dayId", "Vincular ao dia", d.dayId, dayOptions(true))}
+    <div class="full">${input("link", "Link externo / Google Drive", d.link, "url", 'placeholder="Opcional. Se você enviar arquivo, eu preencho o link do Drive automaticamente."')}</div>
+    <div class="full"><label>Arquivo para anexar
+      <input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx" />
+    </label>
+    <div id="driveUploadPreview" class="file-chip preview"><span>Nenhum arquivo novo selecionado.</span></div>
+    ${d.driveFileId ? `<div class="file-chip ok"><span>☁️ Já salvo no Google Drive${d.driveFolderName ? ` em ${escapeHtml(d.driveFolderName)}` : ""}</span>${d.link ? `<a class="ghost tiny" href="${escapeAttr(d.link)}" target="_blank" rel="noopener">Abrir</a>` : ""}</div>` : ""}
+    ${d.file ? `<div class="file-chip"><span>Arquivo atual: ${escapeHtml(d.file.name)} · ${fileSize(d.file.size)}</span></div>` : ""}
+    <p class="muted">Arquivos até 8 MB são enviados automaticamente para a subpasta da categoria no Drive. Para arquivos maiores, suba direto no Drive e cole o link.</p></div>
+    <div class="full">${textarea("notes", "Observações", d.notes)}</div>
+  </div>`, async (fd, form, modalApi={}) => {
+    const fileInput = form.querySelector('input[name="file"]');
+    const preview = form.querySelector('#driveUploadPreview');
+    const file = fileInput?.files?.[0];
+    const payload = {
+      id:d.id,
+      title:fd.get("title").toString().trim(),
+      category:fd.get("category").toString(),
+      status:fd.get("status").toString(),
+      dayId:fd.get("dayId").toString(),
+      link:fd.get("link").toString().trim(),
+      notes:fd.get("notes").toString().trim(),
+      file:d.file || null,
+      driveFileId:d.driveFileId || "",
+      driveFolderName:d.driveFolderName || "",
+      driveFolderId:d.driveFolderId || "",
+      driveFolderUrl:d.driveFolderUrl || "",
+      uploadStatus:d.uploadStatus || ""
+    };
+    payload.driveFolderName = payload.driveFolderName || expectedDriveFolderV76(payload);
+    if(file){
+      if(file.size > 8 * 1024 * 1024){
+        showToast("Arquivo acima de 8 MB. Suba no Drive e cole o link aqui.");
+        if(preview) preview.innerHTML = `<span>⚠️ ${escapeHtml(file.name)} · ${fileSize(file.size)} · acima de 8 MB</span>`;
+        return;
+      }
+      modalApi.setSubmitText?.("Lendo arquivo...");
+      if(preview) preview.innerHTML = `<span>⏳ Lendo ${escapeHtml(file.name)}...</span>`;
+      showToast(`Preparando arquivo para envio ao Drive em ${expectedDriveFolderV76(payload)}...`);
+      payload.file = await readFileAsDataUrl(file);
+      payload.driveFileId = "";
+      payload.uploadStatus = cloudConfigured() ? "uploadingDrive" : "localOnly";
+      payload.driveFolderName = expectedDriveFolderV76({ ...payload, file:payload.file });
+      if(preview) preview.innerHTML = `<span>✅ ${escapeHtml(file.name)} lido. Destino: ${escapeHtml(payload.driveFolderName)}</span>`;
+    }
+    if(doc) Object.assign(doc, payload); else data.documents.push(payload);
+    const targetId = payload.id;
+    closeModal();
+    saveData();
+    renderAll();
+    if(file && cloudConfigured()){
+      showToast(`Enviando arquivo ao Google Drive em ${payload.driveFolderName}. Aguarde...`);
+      await uploadDocumentToDrive(targetId, { auto:true });
+    }else{
+      showToast(file ? "Documento salvo apenas neste navegador" : "Documento salvo");
+      scheduleCloudSave();
+    }
+  }, cloudConfigured() ? "Salvar e enviar ao Drive" : "Salvar documento");
+
+  setTimeout(() => {
+    const form = byId("modalForm");
+    const fileInput = form?.querySelector('input[name="file"]');
+    const categoryInput = form?.querySelector('[name="category"]');
+    const titleInput = form?.querySelector('[name="title"]');
+    const preview = form?.querySelector('#driveUploadPreview');
+    const folderPreview = form?.querySelector('#driveFolderPreviewV76');
+    const updateFolder = () => {
+      if(!folderPreview) return;
+      const folder = expectedDriveFolderV76({ category:categoryInput?.value || d.category, title:titleInput?.value || d.title, file:fileInput?.files?.[0] ? { name:fileInput.files[0].name } : d.file, notes:"" });
+      folderPreview.textContent = `Destino previsto: ${folder}`;
+    };
+    categoryInput?.addEventListener("change", updateFolder);
+    titleInput?.addEventListener("input", updateFolder);
+    if(!fileInput || !preview) return;
+    fileInput.onchange = () => {
+      updateFolder();
+      const file = fileInput.files?.[0];
+      if(!file){ preview.innerHTML = `<span>Nenhum arquivo novo selecionado.</span>`; return; }
+      const folder = expectedDriveFolderV76({ category:categoryInput?.value || d.category, title:titleInput?.value || d.title, file:{ name:file.name } });
+      const isLarge = file.size > 8 * 1024 * 1024;
+      preview.innerHTML = `<span>${isLarge ? "⚠️" : "✅"} ${escapeHtml(file.name)} · ${fileSize(file.size)} · ${isLarge ? "acima de 8 MB, use link do Drive" : (cloudConfigured() ? `será enviado para ${escapeHtml(folder)}` : "será salvo localmente")}</span>`;
+      const submit = byId("modalSubmit");
+      if(submit && !isLarge) submit.textContent = cloudConfigured() ? "Salvar e enviar ao Drive" : "Salvar documento";
+      showToast(isLarge ? "Arquivo grande demais para envio automático." : `Arquivo selecionado. Clique em Salvar e enviar ao Drive. Destino: ${folder}`);
+    };
+    updateFolder();
+  }, 80);
+}
+
+async function uploadDocumentToDrive(id, options={}){
+  if(!cloudConfigured()) { showToast("Configure Apps Script para enviar ao Drive."); return; }
+  const doc = data.documents.find(d => d.id === id);
+  if(!doc || !doc.file || !doc.file.dataUrl){ showToast("Este documento não tem arquivo local para enviar."); return; }
+  try{
+    doc.uploadStatus = "uploadingDrive";
+    doc.driveFolderName = expectedDriveFolderV76(doc);
+    saveData();
+    renderAll();
+    if(!options.silent) showToast(`Enviando para ${doc.driveFolderName}...`);
+    const base64 = String(doc.file.dataUrl).split(",")[1] || "";
+    const payload = {
+      fileName: doc.file.name,
+      mimeType: doc.file.type || "application/octet-stream",
+      base64,
+      folderId: data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || ""),
+      category: doc.category || "",
+      documentId: doc.id,
+      documentData: {
+        id: doc.id,
+        title: doc.title,
+        category: doc.category,
+        status: doc.status,
+        dayId: doc.dayId,
+        link: doc.link || "",
+        notes: doc.notes || "",
+        driveFolderName: doc.driveFolderName || expectedDriveFolderV76(doc),
+        file: { name: doc.file.name, size: doc.file.size, type: doc.file.type || "application/octet-stream" }
+      }
+    };
+    const json = await cloudRequest("uploadFile", payload);
+    if(json.fileId || json.fileUrl){
+      doc.driveFileId = json.fileId || "";
+      doc.link = json.fileUrl || doc.link || "";
+      doc.driveFolderId = json.folderId || doc.driveFolderId || "";
+      doc.driveFolderName = json.folderName || doc.driveFolderName || expectedDriveFolderV76(doc);
+      doc.driveFolderUrl = json.folderUrl || doc.driveFolderUrl || "";
+      doc.uploadStatus = "uploadedDrive";
+      doc.file = { name: doc.file.name, size: doc.file.size, type: doc.file.type, localOnly:false };
+      saveData();
+      renderAll();
+      showToast(json.message || `Arquivo enviado ao Google Drive em ${doc.driveFolderName}`);
+      await saveCloudNow(true);
+      return;
+    }
+    doc.uploadStatus = "pendingDrive";
+    saveData();
+    renderAll();
+    showToast(`Envio solicitado para ${doc.driveFolderName}. Buscando o link na nuvem em alguns segundos...`);
+    setTimeout(() => refreshFromCloudSilently("drive-upload"), 4500);
+    setTimeout(() => refreshFromCloudSilently("drive-upload"), 11000);
+  }catch(err){
+    doc.uploadStatus = "uploadError";
+    saveData();
+    renderAll();
+    showToast(err.message);
+  }
+}

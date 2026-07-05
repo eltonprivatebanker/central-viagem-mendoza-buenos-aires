@@ -1,18 +1,23 @@
-# Central de Viagem — v6.7 Ajuste fino desktop + mapa estável
+# Central de Viagem — v6.8 Limpeza de dados + visão geral profissional
 
-Versão criada para testar os refinamentos pós-integração:
+Versão criada após a integração Google Sheets funcionar de verdade.
 
-- mantém a integração Google Sheets/Apps Script já validada;
-- melhora a estabilidade do mapa no desktop;
-- troca o marcador padrão quebrado do Leaflet por marcadores CSS próprios;
-- reduz o efeito de mapa piscando/recalculando a cada renderização;
-- mantém o refino visual desktop da v6.6;
-- preserva a tela de configurações simples da v6.3/v6.4.
+## O que mudou
 
-## Como subir no GitHub
+- Mantém a integração já validada com Google Sheets/Apps Script.
+- Corrige o período oficial da viagem quando ele foi sobrescrito para 26/07 a 05/08.
+- Normaliza cidades/regiões para evitar duplicidade como `MENDOZA` e `Mendoza`.
+- Unifica `Aconcágua` em `Aconcágua / Alta Montanha`.
+- Deixa o resumo operacional mais limpo, mostrando apenas cidades com dados.
+- Checklist da visão geral fica compacto, com pendências críticas em destaque.
+- Adiciona botão para limpar itens de teste/demonstração.
+- Mapa mantém marcadores numerados e card de detalhe mais limpo.
+- Preserva os ajustes de desktop da v6.6/v6.7.
+
+## Como subir
 
 Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
 
 ## Apps Script
 
-Não precisa refazer a integração se a conexão já estava OK. Só atualize o Apps Script novamente se você quiser substituir o backend pelo arquivo incluído em `google-apps-script/Code.gs`.
+Não precisa alterar o Apps Script se a conexão já está OK. Esta versão altera apenas a interface e a limpeza/normalização dos dados antes de salvar.

@@ -2145,3 +2145,301 @@ function reloadMap(showMessage=true){
     if(showMessage) showToast("Não consegui recarregar o mapa agora");
   }
 }
+
+/* ===== v6.8 — limpeza de dados + visão geral profissional =====
+   Objetivos:
+   - respeitar o período oficial da viagem;
+   - normalizar cidades/regiões e reduzir duplicidades;
+   - deixar o checklist compacto na visão geral;
+   - facilitar limpeza de itens de teste;
+   - deixar o detalhe do mapa mais limpo.
+*/
+const OFFICIAL_TRIP_PERIOD_V68 = "27/07 a 10/08";
+const CITY_ALIASES_V68 = {
+  "mendoza": "Mendoza",
+  "mendonza": "Mendoza",
+  "mendozza": "Mendoza",
+  "buenos aires": "Buenos Aires",
+  "buenosaires": "Buenos Aires",
+  "buenos aires/mendoza": "Buenos Aires / Mendoza",
+  "buenos aires / mendoza": "Buenos Aires / Mendoza",
+  "foz do iguacu": "Foz do Iguaçu",
+  "foz do iguaçu": "Foz do Iguaçu",
+  "puerto iguazu": "Puerto Iguazú",
+  "puerto iguazú": "Puerto Iguazú",
+  "cascavel": "Cascavel",
+  "aconcagua": "Aconcágua / Alta Montanha",
+  "aconcágua": "Aconcágua / Alta Montanha",
+  "aconcagua / alta montanha": "Aconcágua / Alta Montanha",
+  "aconcágua / alta montanha": "Aconcágua / Alta Montanha",
+  "alta montanha": "Aconcágua / Alta Montanha",
+  "potrerillos": "Potrerillos / Cacheuta",
+  "cacheuta": "Potrerillos / Cacheuta",
+  "potrerillos / cacheuta": "Potrerillos / Cacheuta",
+  "deslocamento": "Deslocamento"
+};
+const TEST_WORDS_V68 = [
+  "teste", "ingraç", "integracao", "integração", "dassad", "dsad", "asdasd", "dasdas", "sdasd", "asdf", "lorem"
+];
+
+function normalizeTextV68(value=""){
+  return String(value || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+function canonicalizeCityV68(city=""){
+  const raw = String(city || "").trim();
+  if(!raw) return "";
+  const key = normalizeTextV68(raw).replace(/\s*\/\s*/g,"/");
+  return CITY_ALIASES_V68[key] || CITY_ALIASES_V68[normalizeTextV68(raw)] || raw.replace(/\b\w/g, ch => ch.toUpperCase());
+}
+function canonicalizeDataSetV68(showNotice=false){
+  let changed = false;
+  if(data?.trip){
+    const period = String(data.trip.period || "").trim();
+    if(!period || period === "26/07 a 05/08" || period === "26/07 - 05/08"){
+      data.trip.period = OFFICIAL_TRIP_PERIOD_V68;
+      changed = true;
+    }
+  }
+  const normalizeItemCity = item => {
+    if(!item || typeof item !== "object") return;
+    const before = item.city || "";
+    const after = canonicalizeCityV68(before);
+    if(before && after && before !== after){ item.city = after; changed = true; }
+    if(item.location && normalizeTextV68(item.location) === normalizeTextV68(before) && after && item.location !== after){ item.location = after; changed = true; }
+  };
+  (data.days || []).forEach(normalizeItemCity);
+  (data.places || []).forEach(place => {
+    normalizeItemCity(place);
+    if(place.city === "Aconcágua / Alta Montanha" && (!place.location || normalizeTextV68(place.location) === "aconcagua")){
+      place.location = "Parque Provincial Aconcágua, Mendoza";
+      changed = true;
+    }
+  });
+  (data.reservations || []).forEach(normalizeItemCity);
+  (data.expenses || []).forEach(normalizeItemCity);
+  if(changed){
+    saveData();
+    if(showNotice) showToast("Cidades e período normalizados");
+  }
+  return changed;
+}
+function hasTestTextV68(...values){
+  const text = normalizeTextV68(values.filter(Boolean).join(" "));
+  if(!text) return false;
+  return TEST_WORDS_V68.some(word => text.includes(normalizeTextV68(word)));
+}
+function isLikelyTestItemV68(item){
+  if(!item) return false;
+  return hasTestTextV68(item.title, item.name, item.description, item.notes, item.city, item.category);
+}
+function testDataCountV68(){
+  return ["tasks","places","reservations","documents","expenses"].reduce((sum,key) => sum + (data[key] || []).filter(isLikelyTestItemV68).length, 0);
+}
+function cleanTestDataV68(){
+  const total = testDataCountV68();
+  if(!total){ showToast("Nenhum item de teste encontrado"); return; }
+  if(!confirm(`Remover ${total} item(ns) de teste/demonstração?`)) return;
+  ["tasks","places","reservations","documents","expenses"].forEach(key => {
+    data[key] = (data[key] || []).filter(item => !isLikelyTestItemV68(item));
+  });
+  selectedPlaceId = selectedPlaceId && data.places.some(p => p.id === selectedPlaceId) ? selectedPlaceId : null;
+  saveAndRender("Itens de teste removidos");
+}
+
+function uniqueCities(){
+  const values = [
+    ...TRIP_CITIES.map(c => c.name),
+    ...data.days.map(d => canonicalizeCityV68(d.city)),
+    ...data.places.map(p => canonicalizeCityV68(p.city)),
+    ...data.reservations.map(r => canonicalizeCityV68(r.city)),
+    ...data.expenses.map(e => canonicalizeCityV68(e.city))
+  ].filter(Boolean).filter(c => c !== "Deslocamento");
+  return [...new Set(values)].sort((a,b) => a.localeCompare(b,"pt-BR"));
+}
+
+function renderMetrics(){
+  canonicalizeDataSetV68(false);
+  const openTasks = data.tasks.filter(t => !t.done);
+  const critical = openTasks.filter(t => t.critical);
+  const plannedPlaces = data.places.filter(p => p.dayId).length;
+  const expensesExpected = data.expenses.reduce((sum,e) => sum + Number(e.expected || 0), 0);
+  const reservationsExpected = data.reservations.reduce((sum,r) => sum + Number(r.amount || 0), 0);
+  const paid = data.expenses.reduce((sum,e) => sum + Number(e.paid || 0), 0) + data.reservations.reduce((sum,r) => sum + Number(r.paid || 0), 0);
+  byId("metricPeriod").textContent = data.trip.period || OFFICIAL_TRIP_PERIOD_V68;
+  byId("metricBase").textContent = `Base: ${data.trip.base || "—"}`;
+  byId("metricPlaces").textContent = data.places.length;
+  byId("metricPlannedPlaces").textContent = `${plannedPlaces} vinculados ao roteiro`;
+  byId("metricOpenTasks").textContent = openTasks.length;
+  byId("metricCritical").textContent = `${critical.length} críticas`;
+  byId("metricBudget").textContent = formatCurrency(expensesExpected + reservationsExpected);
+  byId("metricPaid").textContent = `${formatCurrency(paid)} pago`;
+}
+
+function renderOverview(){
+  canonicalizeDataSetV68(false);
+  const done = data.tasks.filter(t => t.done).length;
+  const openTasks = data.tasks.filter(t => !t.done);
+  const critical = openTasks.filter(t => t.critical);
+  const pending = openTasks.filter(t => !t.critical);
+  const pct = data.tasks.length ? Math.round(done / data.tasks.length * 100) : 0;
+  const nextDay = sortedDays()[0];
+  const topTasks = openTasks.slice().sort((a,b) => Number(b.critical) - Number(a.critical)).slice(0,4);
+  const testCount = testDataCountV68();
+  const cityRows = uniqueCities().map(city => ({
+    city,
+    places: data.places.filter(p => canonicalizeCityV68(p.city) === city).length,
+    reservations: data.reservations.filter(r => canonicalizeCityV68(r.city) === city).length,
+    expenses: data.expenses.filter(e => canonicalizeCityV68(e.city) === city).reduce((s,e)=>s+Number(e.expected||0),0)
+  })).filter(row => row.places || row.reservations || row.expenses);
+
+  byId("overviewContent").innerHTML = `
+    <div class="overview-grid overview-grid-v68">
+      <div class="overview-box overview-compact-v68">
+        <div class="overview-title-row-v68">
+          <h3>Checklist da viagem</h3>
+          ${testCount ? `<button class="ghost tiny danger" data-clean-test-v68>Limpar testes (${testCount})</button>` : ""}
+        </div>
+        <div class="progress-bar"><span style="width:${pct}%"></span></div>
+        <div class="overview-status-grid-v68">
+          <span><strong>${done}</strong><small>concluídas</small></span>
+          <span><strong>${critical.length}</strong><small>críticas</small></span>
+          <span><strong>${pending.length}</strong><small>pendentes</small></span>
+        </div>
+        <div class="task-compact-list-v68">
+          ${topTasks.map(task => `
+            <div class="compact-task-v68 ${task.critical ? "critical" : ""}">
+              <input type="checkbox" ${task.done ? "checked" : ""} data-task-toggle="${task.id}" />
+              <div>
+                <strong>${escapeHtml(task.title)}</strong>
+                <p>${escapeHtml(task.description || "")}</p>
+              </div>
+              <span class="tag ${task.critical ? "critical" : "pending"}">${task.critical ? "Crítico" : "Pendente"}</span>
+            </div>`).join("") || `<div class="empty-state">Nenhuma pendência aberta.</div>`}
+        </div>
+        ${(data.tasks.length > topTasks.length) ? `<details class="details-compact-v68"><summary>Ver todas as pendências</summary>
+          <div class="task-list task-list-v68-full">
+            ${data.tasks.map(task => `
+              <div class="task-item">
+                <input type="checkbox" ${task.done ? "checked" : ""} data-task-toggle="${task.id}" />
+                <div>
+                  <strong>${escapeHtml(task.title)}</strong>
+                  <span class="tag ${task.done ? "ok" : task.critical ? "critical" : "pending"}">${task.done ? "Concluído" : task.critical ? "Crítico" : "Pendente"}</span>
+                  <p>${escapeHtml(task.description || "")}</p>
+                  <div class="card-actions">
+                    <button class="ghost tiny" data-edit-task="${task.id}">Editar</button>
+                    <button class="ghost tiny danger" data-delete-task="${task.id}">Excluir</button>
+                  </div>
+                </div>
+              </div>`).join("")}
+          </div>
+        </details>` : ""}
+      </div>
+      <div class="overview-box overview-compact-v68">
+        <h3>Resumo operacional</h3>
+        <div class="operation-next-v68">
+          <span>Próximo dia</span>
+          <strong>${nextDay ? escapeHtml(dayLabel(nextDay.id)) : "Nenhum dia cadastrado."}</strong>
+        </div>
+        <p class="muted"><strong>Pessoas:</strong><br>${escapeHtml(data.trip.people || "—")}</p>
+        <div class="city-breakdown city-breakdown-v68">
+          ${cityRows.map(row => `
+            <div class="city-row">
+              <div><strong>${escapeHtml(row.city)}</strong><br><small class="muted">${row.places} lugar(es) · ${row.reservations} reserva(s)</small></div>
+              <span>${formatCurrency(row.expenses)}</span>
+            </div>`).join("") || `<p class="muted">Cadastre lugares, reservas ou despesas para montar o resumo.</p>`}
+        </div>
+      </div>
+    </div>`;
+
+  document.querySelectorAll("[data-task-toggle]").forEach(el => el.onchange = () => {
+    const task = data.tasks.find(t => t.id === el.dataset.taskToggle);
+    if(task){ task.done = el.checked; saveAndRender("Pendência atualizada"); }
+  });
+  document.querySelectorAll("[data-edit-task]").forEach(el => el.onclick = () => openTaskModal(data.tasks.find(t => t.id === el.dataset.editTask)));
+  document.querySelectorAll("[data-delete-task]").forEach(el => el.onclick = () => deleteItem("tasks", el.dataset.deleteTask, "Excluir esta pendência?"));
+  document.querySelector("[data-clean-test-v68]")?.addEventListener("click", cleanTestDataV68);
+}
+
+function renderSelectedPlaceBox(){
+  const box = byId("selectedPlaceBox");
+  const place = data.places.find(p => p.id === selectedPlaceId) || data.places.find(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
+  if(!place){
+    box.innerHTML = `<p class="muted">Selecione um lugar para ver detalhes aqui.</p>`;
+    return;
+  }
+  box.innerHTML = `<article class="card map-selected-compact-v68">
+    <div class="map-place-title-v68">
+      <div>
+        <h3>${escapeHtml(place.name)}</h3>
+        <p class="muted">${escapeHtml(canonicalizeCityV68(place.city) || "Cidade")} · ${statusLabel(place.status)}</p>
+      </div>
+      <button class="ghost tiny" data-edit-place="${place.id}">Editar</button>
+    </div>
+    ${place.notes ? `<p>${escapeHtml(place.notes)}</p>` : ""}
+    <p class="muted">${dayLabel(place.dayId)} · ${periodLabel(place.period)} · ${escapeHtml(place.startTime || defaultPeriodStart(place.period))}</p>
+    <div class="card-actions">
+      ${place.url ? `<a class="ghost tiny" href="${escapeAttr(place.url)}" target="_blank" rel="noopener">Abrir no Google Maps</a>` : ""}
+      <button class="ghost tiny" data-place-calendar="${place.id}">Google Agenda</button>
+    </div>
+  </article>`;
+  box.querySelector("[data-edit-place]")?.addEventListener("click", () => openPlaceModal(place));
+  box.querySelector("[data-place-calendar]")?.addEventListener("click", () => openGoogleCalendarForEvent(placeCalendarEvent(place)));
+}
+
+function saveAndRender(message="Salvo"){
+  canonicalizeDataSetV68(false);
+  saveData();
+  renderAll();
+  showToast(message);
+  scheduleCloudSave();
+}
+
+function sanitizeDataForCloud(source){
+  canonicalizeDataSetV68(false);
+  const clone = structuredCloneSafe(source);
+  clone.days = (clone.days || []).map(d => ({ ...d, city:canonicalizeCityV68(d.city) }));
+  clone.places = (clone.places || []).map(p => ({ ...p, city:canonicalizeCityV68(p.city), location:p.location || canonicalizeCityV68(p.city) }));
+  clone.reservations = (clone.reservations || []).map(r => ({ ...r, city:canonicalizeCityV68(r.city), location:r.location || canonicalizeCityV68(r.city) }));
+  clone.expenses = (clone.expenses || []).map(e => ({ ...e, city:canonicalizeCityV68(e.city) }));
+  clone.documents = (clone.documents || []).map(doc => {
+    const d = { ...doc };
+    if(d.file){ d.file = { name: d.file.name, size: d.file.size, type: d.file.type, localOnly: !d.driveFileId }; }
+    return d;
+  });
+  clone.settings = { ...clone.settings };
+  delete clone.settings.apiKey;
+  return clone;
+}
+
+async function loadCloudNow(){
+  if(!cloudConfigured()) { showToast("Ative Google Sheets nas configurações."); return; }
+  if(!confirm("Carregar dados da nuvem e substituir os dados locais deste navegador?")) return;
+  try{
+    showToast("Carregando da nuvem...");
+    const json = await cloudRequest("getAll", {});
+    if(!json.data) throw new Error("Nenhum dado encontrado na nuvem ainda.");
+    const incoming = normalizeData(json.data);
+    incoming.settings = { ...incoming.settings, appsScriptUrl:data.settings.appsScriptUrl, apiKey:data.settings.apiKey, syncMode:data.settings.syncMode, autoSync:data.settings.autoSync, calendarId:data.settings.calendarId, driveFolderId:data.settings.driveFolderId, driveFolderUrl:data.settings.driveFolderUrl, lastSyncAt:new Date().toISOString() };
+    data = incoming;
+    canonicalizeDataSetV68(false);
+    saveData();
+    renderAll();
+    renderMapMarkers();
+    showToast("Dados carregados do Google Sheets");
+  }catch(err){ showToast(err.message); }
+}
+
+function init(){
+  ensureV52Defaults();
+  ensureV6Defaults();
+  canonicalizeDataSetV68(false);
+  bindEvents();
+  renderAll();
+  initMap();
+  setTimeout(() => { renderMapMarkers(); forceMapRefresh("init-final"); }, 250);
+}

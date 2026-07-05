@@ -2912,3 +2912,171 @@ function renderItinerary(){
   document.querySelectorAll("[data-day-ics]").forEach(el => el.onclick = () => downloadIcsForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayIcs)), `dia-${el.dataset.dayIcs}.ics`));
   document.querySelectorAll("[data-day-cloud-calendar]").forEach(el => el.onclick = () => createCloudCalendarEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayCloudCalendar))));
 }
+
+/* ===== v7.2 — UX profissional, atalhos inteligentes e alertas de fronteira ===== */
+const FRONTIER_TERMS_V72 = ["foz", "puerto", "iguazu", "iguacu", "fronteira", "argentina", "documentos", "rg", "passaporte"];
+function normalizeForSearchV72(value=""){
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+function isFrontierOrDocumentDayV72(day){
+  if(!day) return false;
+  const text = normalizeForSearchV72([day.title, day.city, day.morning, day.afternoon, day.night, day.transport, day.notes, data?.trip?.base].filter(Boolean).join(" "));
+  const isTravelDay = normalizeForSearchV72(day.city).includes("deslocamento") || text.includes("deslocamento") || text.includes("viagem");
+  return isTravelDay && FRONTIER_TERMS_V72.some(term => text.includes(term));
+}
+function compactDayDateV72(day, idx){
+  const meta = dayMetaV70(day, idx);
+  const dateText = meta.weekday && meta.weekday !== "sem data" ? meta.weekday : (meta.date || "Sem data");
+  return { meta, dateText };
+}
+function periodSummaryV72(day, key, title, note){
+  const places = data.places.filter(p => p.dayId === day.id && p.period === key);
+  const periodReservations = data.reservations.filter(r => (r.dayId === day.id || r.date === day.date) && ((key === "morning" && (!r.time || String(r.time) < "12:00")) || (key === "afternoon" && String(r.time || "14:00") >= "12:00" && String(r.time || "14:00") < "18:00") || (key === "night" && String(r.time || "19:00") >= "18:00")));
+  const linked = [
+    ...places.slice(0,3).map(place => `<button class="mini-chip-v72" data-select-place="${place.id}" title="Centralizar no mapa: ${escapeAttr(place.name)}"><span>📍</span><span>${escapeHtml(place.name)}</span></button>`),
+    ...periodReservations.slice(0,2).map(r => `<button class="mini-chip-v72 reservation" data-edit-reservation="${r.id}" title="Editar reserva: ${escapeAttr(r.title)}"><span>🎫</span><span>${escapeHtml(r.title)}</span></button>`)
+  ].join("");
+  return `<section class="period-v72">
+    <div class="period-title-v72"><strong>${title}</strong><button class="add-mini-v72" data-add-place-to-day="${day.id}" data-period="${key}" title="Adicionar lugar neste período">+</button></div>
+    ${note ? `<div class="period-note-v72">${escapeHtml(note)}</div>` : `<div class="period-note-v72 empty">Sem programação definida</div>`}
+    ${linked ? `<div class="period-linked-v72">${linked}</div>` : ""}
+  </section>`;
+}
+function renderItinerary(){
+  const sorted = sortedDays();
+  const list = byId("itineraryList");
+  list.classList.add("itinerary-list-v72");
+  list.innerHTML = sorted.map((day, idx) => {
+    const { meta, dateText } = compactDayDateV72(day, idx);
+    const dayPlaces = data.places.filter(p => p.dayId === day.id);
+    const dayReservations = data.reservations.filter(r => r.dayId === day.id || (r.date && r.date === day.date));
+    const collapsed = window.collapsedDayIdsV71.has(day.id);
+    const statusBits = [];
+    if(dayPlaces.length) statusBits.push(`${dayPlaces.length} lugar(es)`);
+    if(dayReservations.length) statusBits.push(`${dayReservations.length} reserva(s)`);
+    const statusText = statusBits.join(" · ") || "roteiro livre";
+    const frontier = isFrontierOrDocumentDayV72(day);
+    return `<article class="itinerary-day itinerary-day-v72 ${collapsed ? "is-collapsed" : ""}" data-day-card="${day.id}">
+      <div class="day-head-v72">
+        <button class="day-identity-v72" data-toggle-day="${day.id}" title="${collapsed ? "Abrir dia" : "Recolher dia"}">
+          <span class="day-badge-v72">${String(idx + 1).padStart(2,"0")}</span>
+          <span class="day-title-v72">
+            <strong>Dia ${String(idx + 1).padStart(2,"0")} · ${escapeHtml(meta.title)}</strong>
+            <small>${escapeHtml(dateText)} · ${escapeHtml(meta.city)} · ${escapeHtml(statusText)}</small>
+          </span>
+        </button>
+        <div class="day-actions-v72">
+          <button class="secondary tiny" data-edit-day="${day.id}">Editar</button>
+          <details class="day-more-v72"><summary aria-label="Mais ações">⋮</summary><div class="day-more-menu-v72">
+            <button class="ghost tiny" data-toggle-day="${day.id}">${collapsed ? "Abrir detalhes" : "Recolher detalhes"}</button>
+            <button class="ghost tiny" data-add-place-to-day="${day.id}" data-period="free">Adicionar lugar</button>
+            <button class="ghost tiny" data-day-calendar="${day.id}">Abrir no Google Agenda</button>
+            ${cloudCalendarButton("day", day.id)}
+            <button class="ghost tiny" data-day-ics="${day.id}">Baixar .ics</button>
+            <button class="ghost tiny" data-move-day="${day.id}" data-dir="up" ${idx===0?"disabled":""}>Mover para cima</button>
+            <button class="ghost tiny" data-move-day="${day.id}" data-dir="down" ${idx===sorted.length-1?"disabled":""}>Mover para baixo</button>
+            <button class="ghost tiny" data-duplicate-day="${day.id}">Duplicar dia</button>
+            <button class="ghost tiny danger" data-delete-day="${day.id}">Excluir dia</button>
+          </div></details>
+        </div>
+      </div>
+      <div class="day-body-v72">
+        ${frontier ? `<div class="frontier-alert-v72">⚠️ Fronteira/documentos: conferir RG/passaporte, autorização do Oliver, seguro, reservas e comprovantes antes do deslocamento.</div>` : ""}
+        <div class="day-periods-v72">
+          ${periodSummaryV72(day, "morning", "☀️ Manhã", day.morning)}
+          ${periodSummaryV72(day, "afternoon", "🌤️ Tarde", day.afternoon)}
+          ${periodSummaryV72(day, "night", "🌙 Noite", day.night)}
+        </div>
+        ${(day.lodging || day.transport || day.notes || dayReservations.length) ? `<div class="day-footer-lite-v72">
+          ${day.lodging ? `<span>🏨 ${escapeHtml(day.lodging)}</span>` : ""}
+          ${day.transport ? `<span>🚗 ${escapeHtml(day.transport)}</span>` : ""}
+          ${day.notes ? `<span>📝 ${escapeHtml(day.notes)}</span>` : ""}
+          ${dayReservations.length ? `<span>🎫 ${dayReservations.length} reserva(s)</span>` : ""}
+        </div>` : ""}
+      </div>
+    </article>`;
+  }).join("") || `<div class="empty-state">Nenhum dia cadastrado. Clique em + Novo dia.</div>`;
+  document.querySelectorAll("[data-toggle-day]").forEach(el => el.onclick = () => {
+    const id = el.dataset.toggleDay;
+    if(window.collapsedDayIdsV71.has(id)) window.collapsedDayIdsV71.delete(id); else window.collapsedDayIdsV71.add(id);
+    renderItinerary();
+  });
+  document.querySelectorAll("[data-edit-day]").forEach(el => el.onclick = () => openDayModal(data.days.find(d => d.id === el.dataset.editDay)));
+  document.querySelectorAll("[data-delete-day]").forEach(el => el.onclick = () => deleteDay(el.dataset.deleteDay));
+  document.querySelectorAll("[data-duplicate-day]").forEach(el => el.onclick = () => duplicateDay(el.dataset.duplicateDay));
+  document.querySelectorAll("[data-move-day]").forEach(el => el.onclick = () => moveDay(el.dataset.moveDay, el.dataset.dir));
+  document.querySelectorAll("[data-add-place-to-day]").forEach(el => openPlaceBtnBindV70(el));
+  document.querySelectorAll("[data-select-place]").forEach(el => el.onclick = () => selectPlace(el.dataset.selectPlace, true));
+  document.querySelectorAll("[data-edit-reservation]").forEach(el => el.onclick = () => openReservationModal(data.reservations.find(r => r.id === el.dataset.editReservation)));
+  document.querySelectorAll("[data-day-calendar]").forEach(el => el.onclick = () => openGoogleCalendarForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayCalendar))));
+  document.querySelectorAll("[data-day-ics]").forEach(el => el.onclick = () => downloadIcsForEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayIcs)), `dia-${el.dataset.dayIcs}.ics`));
+  document.querySelectorAll("[data-day-cloud-calendar]").forEach(el => el.onclick = () => createCloudCalendarEvent(dayCalendarEvent(data.days.find(d => d.id === el.dataset.dayCloudCalendar))));
+}
+
+const renderMetricsBaseV72 = renderMetrics;
+renderMetrics = function(){
+  renderMetricsBaseV72();
+  enhanceMetricCardsV72();
+};
+function enhanceMetricCardsV72(){
+  const cards = document.querySelectorAll(".metric-card");
+  const actions = [
+    { label:"Editar período da viagem", run: () => openTripModal() },
+    { label:"Abrir lugares salvos", run: () => setView("places") },
+    { label:"Ver pendências prioritárias", run: () => { setView("overview"); setTimeout(() => document.querySelector(".overview-box")?.scrollIntoView({behavior:"smooth", block:"start"}), 80); } },
+    { label:"Abrir orçamento", run: () => setView("budget") }
+  ];
+  cards.forEach((card, idx) => {
+    const action = actions[idx];
+    if(!action) return;
+    card.classList.add("metric-clickable-v72");
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("title", action.label);
+    card.onclick = action.run;
+    card.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); action.run(); } };
+  });
+}
+
+const selectPlaceBaseV72 = selectPlace;
+selectPlace = function(id, fly=true){
+  selectedPlaceId = id;
+  const place = data.places.find(p => p.id === id);
+  if(place && map){
+    const lat = Number(place.lat), lng = Number(place.lng);
+    if(Number.isFinite(lat) && Number.isFinite(lng)){
+      map.flyTo([lat,lng], Math.max(map.getZoom(), 13), { duration: fly ? .55 : .25 });
+      setTimeout(() => forceMapRefresh("select-place-v72"), 120);
+    }
+  }
+  renderPlaces();
+  renderSelectedPlaceBox();
+  const mapPanel = document.querySelector(".map-panel");
+  if(mapPanel){
+    mapPanel.classList.add("map-focus-v72");
+    setTimeout(() => mapPanel.classList.remove("map-focus-v72"), 900);
+  }
+};
+window.selectPlaceFromPopup = function(id){ selectPlace(id, true); };
+
+const renderSelectedPlaceBoxBaseV72 = renderSelectedPlaceBox;
+renderSelectedPlaceBox = function(){
+  renderSelectedPlaceBoxBaseV72();
+  const box = byId("selectedPlaceBox");
+  if(box && selectedPlaceId){
+    box.classList.add("selected-place-v72");
+  }
+};
+
+const setViewBaseV72 = setView;
+setView = function(view){
+  setViewBaseV72(view);
+  document.querySelectorAll("details.day-more-v72[open]").forEach(d => d.removeAttribute("open"));
+  if(view === "places") setTimeout(() => forceMapRefresh("places-view-v72"), 180);
+};
+
+const renderAllBaseV72 = renderAll;
+renderAll = function(){
+  renderAllBaseV72();
+  enhanceMetricCardsV72();
+};

@@ -1,20 +1,22 @@
-# Central de Viagem — v7.10 Documentos grandes via Drive
+# Central de Viagem — v7.11 Busca inteligente de lugares
 
-Versão focada em documentos e anexos grandes.
+Versão focada em deixar o cadastro de lugares mais parecido com uma busca do Google, usando uma base local/curada de sugestões da viagem.
 
 ## O que mudou
 
-- Arquivos até 8 MB continuam com envio automático pela Central.
-- Arquivos acima de 8 MB não travam mais em processamento.
-- Para arquivos grandes, a Central abre automaticamente a subpasta correta do Google Drive.
-- Adicionados botões: **Abrir pasta**, **Buscar no Drive** e **Colar link**.
-- Depois do link salvo, o documento aparece com botão **Abrir / baixar** para consulta rápida.
-- Apps Script recebeu ações `getUploadFolder` e `listDriveFiles` para localizar subpastas e arquivos recentes.
+- Busca de lugares com sugestões rápidas na aba Lugares.
+- Ao escolher uma sugestão, o sistema abre o cadastro já preenchido.
+- No modal de lugar, o campo principal agora funciona como pesquisa inteligente.
+- Sugestões preenchem cidade, categoria, prioridade, link do Google Maps, coordenadas e observações quando disponíveis.
+- Mantém campos avançados recolhidos.
+- Não precisa de Google Places API nesta fase.
+
+## Observação
+
+Esta versão usa uma base local/curada de lugares de Cascavel, Foz do Iguaçu, Puerto Iguazú, Buenos Aires, Mendoza, Aconcágua e arredores.
+
+Para uma busca real do Google em tempo real seria necessário integrar Google Places API, com chave/API e possíveis custos.
 
 ## Como subir
 
 Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5.
-
-## Apps Script
-
-Atualize também o `google-apps-script/Code.gs` no Apps Script e publique uma nova versão da implantação.

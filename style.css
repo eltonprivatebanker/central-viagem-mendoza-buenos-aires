@@ -899,3 +899,66 @@ a{color:var(--gold-2);text-decoration:none}.app-shell{display:grid;grid-template
 @media (min-width: 980px){
   .doc-modal-v710{max-height: calc(100vh - 150px); overflow:auto;}
 }
+
+
+/* v7.11 — Busca inteligente de lugares */
+.filter-row{ position: relative; }
+.place-search-panel-v711{
+  position:absolute;
+  z-index:50;
+  top: calc(100% + 8px);
+  left:0;
+  width:min(520px, 100%);
+  background:#0d1929;
+  border:1px solid rgba(148, 163, 184, .28);
+  border-radius:18px;
+  box-shadow:0 20px 50px rgba(0,0,0,.38);
+  padding:8px;
+}
+.place-search-panel-v711 button,
+.modal-place-suggestions-v711 .place-suggestion-v711{
+  width:100%;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  text-align:left;
+  border:0;
+  border-radius:14px;
+  padding:11px 12px;
+  background:transparent;
+  color:#f8fafc;
+  cursor:pointer;
+}
+.place-search-panel-v711 button:hover,
+.modal-place-suggestions-v711 .place-suggestion-v711:hover{
+  background:rgba(255,255,255,.07);
+}
+.place-search-panel-v711 strong,
+.modal-place-suggestions-v711 strong{ font-size:.95rem; }
+.place-search-panel-v711 small,
+.modal-place-suggestions-v711 small{
+  color:#9fb6d8;
+  font-size:.78rem;
+  line-height:1.25;
+  max-width:48%;
+}
+.modal-place-suggestions-v711{
+  margin-top:8px;
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:8px;
+}
+.modal-place-suggestions-v711 .place-suggestion-v711{
+  border:1px solid rgba(148,163,184,.18);
+  background:rgba(15, 23, 42, .42);
+}
+.place-modal-v711 .compact-v711{
+  padding:12px 14px;
+  font-size:.95rem;
+}
+.place-modal-v711 textarea{ min-height:82px; }
+@media (max-width: 780px){
+  .modal-place-suggestions-v711{ grid-template-columns:1fr; }
+  .place-search-panel-v711{ width:100%; }
+}

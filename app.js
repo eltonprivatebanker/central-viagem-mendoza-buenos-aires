@@ -4037,3 +4037,253 @@ function renderDocuments(){
   document.querySelectorAll("[data-search-drive-doc]").forEach(el => el.onclick = () => searchRecentDriveFilesForDocumentV710(el.dataset.searchDriveDoc));
   document.querySelectorAll("[data-paste-drive-link]").forEach(el => el.onclick = () => promptDriveLinkForDocumentV710(el.dataset.pasteDriveLink));
 }
+
+
+/* v7.11 — Busca inteligente de lugares: sugestões rápidas e preenchimento automático */
+function normalizeSearchV711(value){
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+function placeSuggestionPoolV711(){
+  const fromCurated = (typeof PLACE_SUGGESTIONS !== "undefined" ? PLACE_SUGGESTIONS : []).map(item => ({
+    source:"suggestion",
+    id:`s-${normalizeSearchV711(item.name).replace(/\W+/g,"-")}`,
+    name:item.name,
+    city:item.city || "",
+    category:item.category || "Passeio",
+    status:"wishlist",
+    priority:item.priority || "Média",
+    dayId:"",
+    period:"free",
+    lat:item.lat || "",
+    lng:item.lng || "",
+    url:item.url || "",
+    location:item.location || `${item.name}, ${item.city || ""}`,
+    startTime: item.startTime || "09:00",
+    endTime: item.endTime || "12:00",
+    notes:item.notes || "",
+    label:"Sugestão da viagem"
+  }));
+  const fromExisting = (data.places || []).map(item => ({
+    ...item,
+    source:"existing",
+    label:"Já cadastrado"
+  }));
+  const seen = new Set();
+  return [...fromExisting, ...fromCurated].filter(item => {
+    const key = normalizeSearchV711(`${item.name}|${item.city}`);
+    if(!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+function searchPlaceSuggestionsV711(query, limit=8){
+  const q = normalizeSearchV711(query);
+  const pool = placeSuggestionPoolV711();
+  if(!q) return pool.filter(p => p.source === "suggestion").slice(0, limit);
+  const tokens = q.split(/\s+/).filter(Boolean);
+  return pool.map(item => {
+    const hay = normalizeSearchV711(`${item.name} ${item.city} ${item.category} ${item.notes} ${item.location || ""}`);
+    let score = 0;
+    if(normalizeSearchV711(item.name).startsWith(q)) score += 80;
+    if(normalizeSearchV711(item.name).includes(q)) score += 50;
+    if(normalizeSearchV711(item.city).includes(q)) score += 25;
+    if(normalizeSearchV711(item.category).includes(q)) score += 15;
+    tokens.forEach(t => { if(hay.includes(t)) score += 8; });
+    if(item.source === "existing") score += 6;
+    return { item, score };
+  }).filter(x => x.score > 0).sort((a,b) => b.score - a.score).slice(0, limit).map(x => x.item);
+}
+function applyPlaceSuggestionToFormV711(item){
+  const form = byId("modalForm");
+  if(!form || !item) return;
+  const set = (name, value, overwrite=true) => {
+    const el = form.querySelector(`[name="${name}"]`);
+    if(!el) return;
+    if(overwrite || !el.value) el.value = value ?? "";
+    el.dispatchEvent(new Event("change", { bubbles:true }));
+  };
+  set("name", item.name, true);
+  set("city", item.city, true);
+  set("category", item.category || "Passeio", true);
+  set("priority", item.priority || "Média", true);
+  set("url", item.url || "", true);
+  set("notes", item.notes || "", true);
+  set("lat", item.lat || "", true);
+  set("lng", item.lng || "", true);
+  set("location", item.location || `${item.name}, ${item.city || ""}`, true);
+  const status = form.querySelector('[name="status"]');
+  if(status && !status.value) status.value = item.status || "wishlist";
+  showToast("Lugar preenchido pela sugestão");
+}
+function renderModalPlaceSuggestionsV711(query=""){
+  const box = byId("modalPlaceSuggestionBox");
+  if(!box) return;
+  const suggestions = searchPlaceSuggestionsV711(query, query ? 6 : 5).filter(p => p.source === "suggestion" || p.source === "existing");
+  box.innerHTML = suggestions.length ? suggestions.map(item => `
+    <button type="button" class="place-suggestion-v711" data-suggest-place-v711="${escapeAttr(item.id || item.name)}">
+      <strong>${escapeHtml(item.name)}</strong>
+      <small>${escapeHtml(item.city || "Cidade")} · ${escapeHtml(item.category || "Passeio")} · ${escapeHtml(item.label || "Sugestão")}</small>
+    </button>`).join("") : `<span class="muted">Digite um nome, cidade ou categoria para buscar nas sugestões.</span>`;
+  box.querySelectorAll("[data-suggest-place-v711]").forEach(btn => {
+    btn.onclick = () => {
+      const selected = suggestions.find(s => String(s.id || s.name) === btn.dataset.suggestPlaceV711);
+      applyPlaceSuggestionToFormV711(selected);
+    };
+  });
+}
+function enhancePlaceSearchBarV711(){
+  const inputEl = byId("searchPlaces");
+  if(!inputEl || inputEl.dataset.enhancedV711) return;
+  inputEl.dataset.enhancedV711 = "1";
+  inputEl.placeholder = "Pesquisar como no Google: lugar, cidade, vinícola, parque...";
+  inputEl.setAttribute("autocomplete", "off");
+  const wrap = inputEl.parentElement;
+  if(!wrap) return;
+  const panel = document.createElement("div");
+  panel.id = "placeSearchPanelV711";
+  panel.className = "place-search-panel-v711";
+  panel.hidden = true;
+  wrap.appendChild(panel);
+  function renderPanel(){
+    const q = inputEl.value.trim();
+    const results = searchPlaceSuggestionsV711(q, 6);
+    panel.hidden = !q;
+    panel.innerHTML = results.map(item => `
+      <button type="button" data-search-place-choice-v711="${escapeAttr(item.source === "existing" ? item.id : item.name)}" data-source="${escapeAttr(item.source)}">
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${escapeHtml(item.city || "Cidade")} · ${escapeHtml(item.category || "Passeio")} · ${escapeHtml(item.label || "Sugestão")}</small>
+      </button>`).join("");
+    panel.querySelectorAll("[data-search-place-choice-v711]").forEach(btn => {
+      btn.onclick = () => {
+        const source = btn.dataset.source;
+        const choice = btn.dataset.searchPlaceChoiceV711;
+        const selected = results.find(r => (source === "existing" ? r.id : r.name) === choice);
+        panel.hidden = true;
+        if(!selected) return;
+        if(selected.source === "existing"){
+          inputEl.value = selected.name;
+          renderPlaces();
+          selectPlace(selected.id);
+        }else{
+          openPlaceModal(null, selected);
+        }
+      };
+    });
+  }
+  inputEl.addEventListener("input", renderPanel);
+  inputEl.addEventListener("focus", renderPanel);
+  document.addEventListener("click", ev => {
+    if(!panel.contains(ev.target) && ev.target !== inputEl) panel.hidden = true;
+  });
+}
+
+function openPlaceModal(place=null, preset={}){
+  const suggestionPreset = preset && preset.name ? preset : null;
+  const presetDay = data.days.find(d => d.id === preset.dayId);
+  const defaultCity = preset.city || suggestionPreset?.city || presetDay?.city || data.trip.base?.split("/")[0]?.trim() || "Mendoza";
+  const p = place || { 
+    id: uid(),
+    name: suggestionPreset?.name || "",
+    city: defaultCity,
+    category: suggestionPreset?.category || "Passeio",
+    status: suggestionPreset?.status || "wishlist",
+    priority: suggestionPreset?.priority || "Média",
+    dayId:preset.dayId || "",
+    period:preset.period || "free",
+    lat:preset.lat || suggestionPreset?.lat || "",
+    lng:preset.lng || suggestionPreset?.lng || "",
+    url:suggestionPreset?.url || "",
+    location:suggestionPreset?.location || "",
+    startTime: preset.startTime || suggestionPreset?.startTime || defaultPeriodStart(preset.period),
+    endTime: preset.endTime || suggestionPreset?.endTime || defaultPeriodEnd(preset.period),
+    notes:suggestionPreset?.notes || ""
+  };
+  const suggestionOptions = placeSuggestionPoolV711().map(item => `<option value="${escapeAttr(item.name)}">${escapeHtml(item.city || "")}</option>`).join("");
+  openModal(place ? "Editar lugar" : "Adicionar lugar", `<div class="form-grid place-modal-simple place-modal-v711">
+    <div class="full modal-helper success-soft compact-v711"><strong>Busca rápida</strong><br>Digite como no Google ou escolha uma sugestão. Eu preencho cidade, categoria, mapa, coordenadas e observações quando houver dados.</div>
+    <div class="full">
+      <label>Pesquisar / nome do lugar
+        <input name="name" id="placeNameSmartV711" list="placeSuggestionsList" value="${escapeAttr(p.name)}" required placeholder="Ex.: Puerto Madero, Recoleta, Parque San Martín, vinícola..." autocomplete="off">
+        <datalist id="placeSuggestionsList">${suggestionOptions}</datalist>
+      </label>
+      <div id="modalPlaceSuggestionBox" class="modal-place-suggestions-v711"></div>
+    </div>
+    ${selectInput("city", "Cidade / região", p.city, cityOptions(p.city))}
+    ${selectInput("dayId", "Quando visitar", p.dayId, dayOptions(true))}
+    ${selectInput("period", "Período", p.period, [{value:"free",label:"Sem período"},{value:"morning",label:"Manhã"},{value:"afternoon",label:"Tarde"},{value:"night",label:"Noite"}])}
+    <div class="full">${input("url", "Link do Google Maps", p.url, "url", 'placeholder="Cole o link do Maps se tiver"')}</div>
+    <div class="full">${textarea("notes", "Observações", p.notes, 'placeholder="Opcional. Reserva, melhor horário, cuidados, por que vale ir..."')}</div>
+    <div class="full">
+      <details class="advanced-box">
+        <summary>Avançado: categoria, status, agenda e coordenadas</summary>
+        <div class="form-grid advanced-grid">
+          ${selectInput("category", "Categoria", p.category || "Passeio", ["Passeio","Bairro","Parque","Mirante","Montanha","Gastronomia","Restaurante","Vinícola","Cultura","Hospedagem","Compras","Outro"])}
+          ${selectInput("status", "Status", p.status || "wishlist", [{value:"wishlist",label:"Quero visitar"},{value:"planned",label:"No roteiro"},{value:"booked",label:"Reservado"},{value:"done",label:"Concluído"},{value:"discarded",label:"Descartado"}])}
+          ${selectInput("priority", "Prioridade", p.priority || "Média", ["Alta","Média","Baixa"])}
+          ${input("startTime", "Início", p.startTime || defaultPeriodStart(p.period), "time")}
+          ${input("endTime", "Fim", p.endTime || defaultPeriodEnd(p.period), "time")}
+          <div class="full">${input("location", "Localização para Google Agenda", p.location || p.city || p.name)}</div>
+          ${input("lat", "Latitude", p.lat, "number", 'step="any" placeholder="-32.8895"')}
+          ${input("lng", "Longitude", p.lng, "number", 'step="any" placeholder="-68.8458"')}
+          <div class="full"><button type="button" class="secondary" id="btnExtractCoords">Tentar preencher coordenadas pelo link</button></div>
+        </div>
+      </details>
+    </div>
+  </div>`, fd => {
+    const dayId = fd.get("dayId").toString();
+    const status = fd.get("status").toString();
+    const payload = {
+      id: p.id,
+      name: fd.get("name").toString().trim(),
+      city: fd.get("city").toString().trim(),
+      category: fd.get("category").toString().trim() || "Passeio",
+      status: dayId && status === "wishlist" ? "planned" : status,
+      priority: fd.get("priority").toString() || "Média",
+      dayId,
+      period: fd.get("period").toString(),
+      startTime: fd.get("startTime").toString() || defaultPeriodStart(fd.get("period").toString()),
+      endTime: fd.get("endTime").toString() || defaultPeriodEnd(fd.get("period").toString()),
+      location: fd.get("location").toString().trim() || `${fd.get("name").toString().trim()}, ${fd.get("city").toString().trim()}`,
+      lat: fd.get("lat") === "" ? "" : Number(fd.get("lat")),
+      lng: fd.get("lng") === "" ? "" : Number(fd.get("lng")),
+      url: fd.get("url").toString().trim(),
+      notes: fd.get("notes").toString().trim()
+    };
+    if(place) Object.assign(place, payload); else data.places.push(payload);
+    selectedPlaceId = payload.id;
+    closeModal(); saveAndRender("Lugar salvo");
+  }, place ? "Salvar lugar" : "Salvar lugar");
+
+  setTimeout(() => {
+    const form = byId("modalForm");
+    if(!form) return;
+    const nameInput = form.querySelector('[name="name"]');
+    const urlInput = form.querySelector('[name="url"]');
+    const latInput = form.querySelector('[name="lat"]');
+    const lngInput = form.querySelector('[name="lng"]');
+    const locationInput = form.querySelector('[name="location"]');
+    const citySelect = form.querySelector('[name="city"]');
+    nameInput?.addEventListener("input", () => renderModalPlaceSuggestionsV711(nameInput.value));
+    nameInput?.addEventListener("change", () => {
+      const selected = searchPlaceSuggestionsV711(nameInput.value, 1)[0];
+      if(selected && normalizeSearchV711(selected.name) === normalizeSearchV711(nameInput.value)) applyPlaceSuggestionToFormV711(selected);
+    });
+    citySelect?.addEventListener("change", () => {
+      if(locationInput && nameInput?.value) locationInput.value = `${nameInput.value}, ${citySelect.value}`;
+      renderModalPlaceSuggestionsV711(nameInput?.value || citySelect.value);
+    });
+    byId("btnExtractCoords")?.addEventListener("click", () => {
+      const result = extractLatLngFromMapsUrl(urlInput?.value);
+      if(result){ latInput.value = result.lat; lngInput.value = result.lng; showToast("Coordenadas preenchidas"); }
+      else alert("Não encontrei latitude/longitude neste link. O link curto do Maps pode ser salvo normalmente.");
+    });
+    renderModalPlaceSuggestionsV711(nameInput?.value || citySelect?.value || "");
+  }, 80);
+}
+
+const renderPlacesBaseV711 = renderPlaces;
+renderPlaces = function(){
+  renderPlacesBaseV711();
+  enhancePlaceSearchBarV711();
+};
+

@@ -1,14 +1,20 @@
-# Central de Viagem — v7.15 Próximo dia navegável + documentos limpos
+# Central de Viagem — v7.17 Inspiração Notion
 
-Versão focada em dois refinamentos de fluidez:
+Versão focada em organização rápida, visualizações e menos informação solta na tela.
 
-- O card **Próximo dia** na Home agora é clicável e leva diretamente ao dia correspondente no Roteiro.
-- A aba **Documentos** ficou mais compacta: arquivos em linha limpa, ações secundárias agrupadas em **Mais** e filtros rápidos por documentos com link/pendentes.
+## O que mudou
+
+- Aba **Documentos** virou uma lista compacta estilo database, com visualizações: todos, pendentes, com link e a organizar.
+- Criada a **Caixa de entrada / A organizar** na Home para lugares sem dia, documentos sem link e reservas sem data.
+- Aba **Roteiro** ganhou templates rápidos: deslocamento, Buenos Aires, Mendoza, vinícola e fronteira/documentos.
+- Cada dia pode abrir como uma “página do dia”, reunindo manhã/tarde/noite, lugares, reservas e documentos vinculados.
+- Pastas de documentos viraram filtros compactos, sem cards grandes ou nomes cortados.
+- Mantida a integração Google Sheets / Apps Script / Drive já validada.
 
 ## Como subir
 
-Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5.
+Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
 
 ## Apps Script
 
-Não precisa alterar o Apps Script nesta versão, se ele já estiver funcionando com upload em subpastas do Drive.
+Não precisa atualizar o Apps Script nesta versão, desde que ele já esteja funcionando com upload e subpastas do Drive.

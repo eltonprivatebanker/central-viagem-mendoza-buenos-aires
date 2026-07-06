@@ -4913,3 +4913,370 @@ renderAll = function(){
   renderAllBaseV715();
   applyHomeShellV713(currentViewNameV712());
 };
+
+
+/* ===== v7.16 — Documentos sem recorte e lista limpa ===== */
+function docLinkStateLabelV716(doc){
+  if(doc.driveFileId || doc.link) return "Com link no Drive";
+  if(doc.uploadStatus === "manualLarge") return "Aguardando envio manual";
+  if(doc.uploadStatus === "uploadRequested") return "Envio solicitado";
+  if(doc.uploadStatus === "uploadError") return "Erro no envio";
+  return "Sem link";
+}
+function docStatusClassV716(doc){
+  if(doc.driveFileId || doc.link) return "ok";
+  if(doc.uploadStatus === "uploadError") return "critical";
+  if(doc.uploadStatus === "uploadRequested" || doc.uploadStatus === "manualLarge") return "pending";
+  return "muted";
+}
+function docFolderShortNameV716(folder){
+  return String(folder || "Documentos").replace(/^\d+\s*-\s*/, "");
+}
+function renderDocuments(){
+  const folders = docFolderDefinitionsV79();
+  const docs = data.documents || [];
+  const docsByFolder = new Map(folders.map(f => [f.folder, []]));
+  docs.forEach(doc => {
+    const folder = docFolderForV79(doc);
+    if(!docsByFolder.has(folder)) docsByFolder.set(folder, []);
+    docsByFolder.get(folder).push(doc);
+  });
+  const stats = documentStatsV712();
+  byId("documentsList").innerHTML = `<div class="documents-focus-v716">
+    <div class="docs-hero-v716">
+      <div>
+        <span class="pill">Arquivos</span>
+        <h3>Documentos da viagem</h3>
+        <p>Envie arquivos pequenos pela Central. Para arquivos grandes, abra a pasta correta do Drive e vincule o link.</p>
+      </div>
+      <button class="primary" data-new-doc-v716>+ Enviar documento</button>
+    </div>
+
+    <div class="doc-stats-v716" aria-label="Resumo dos documentos">
+      <button type="button" data-doc-filter-v716="all"><strong>${stats.total}</strong><span>documentos</span></button>
+      <button type="button" data-doc-filter-v716="drive"><strong>${stats.drive}</strong><span>com link</span></button>
+      <button type="button" data-doc-filter-v716="pending"><strong>${stats.pending}</strong><span>pendentes</span></button>
+    </div>
+
+    <div class="doc-folder-grid-v716" aria-label="Pastas do Drive">
+      ${folders.map(f => {
+        const list = docsByFolder.get(f.folder) || [];
+        const pending = list.filter(d => !(d.driveFileId || d.link)).length;
+        return `<button type="button" class="doc-folder-card-v716" data-doc-folder-jump-v716="${escapeAttr(f.folder)}">
+          <span class="doc-folder-icon-v716">${f.icon}</span>
+          <span class="doc-folder-title-v716">${escapeHtml(f.folder)}</span>
+          <small>${list.length ? `${list.length} arquivo(s)${pending ? ` · ${pending} pendente(s)` : ""}` : "Sem arquivos"}</small>
+        </button>`;
+      }).join("")}
+    </div>
+
+    <div class="doc-list-head-v716">
+      <div>
+        <h3>Arquivos cadastrados</h3>
+        <small>${stats.total ? "Abra, vincule ou corrija documentos da viagem." : "Nenhum documento cadastrado ainda."}</small>
+      </div>
+      <button class="secondary tiny" data-new-doc-v716>+ Documento</button>
+    </div>
+
+    <div class="doc-table-v716">
+      ${docs.length ? docs.map(doc => {
+        const folder = docFolderForV79(doc);
+        const link = documentDriveUrlV710(doc);
+        const title = doc.title || doc.file?.name || "Documento da viagem";
+        return `<article class="doc-line-v716" data-doc-row-folder-v716="${escapeAttr(folder)}" data-doc-has-link-v716="${link ? "yes" : "no"}">
+          <div class="doc-line-icon-v716" aria-hidden="true">📎</div>
+          <div class="doc-line-main-v716">
+            <strong>${escapeHtml(title)}</strong>
+            <small>${escapeHtml(folder)} · ${escapeHtml(shortDocDayLabelV715(doc.dayId))}</small>
+            <em class="doc-link-state-v716 ${docStatusClassV716(doc)}">${escapeHtml(docLinkStateLabelV716(doc))}</em>
+          </div>
+          <div class="doc-line-meta-v716">
+            <span class="tag blue">${escapeHtml(doc.category || docFolderShortNameV716(folder))}</span>
+            <span class="tag ${doc.status === "Concluído" ? "ok" : "pending"}">${escapeHtml(doc.status || "Pendente")}</span>
+          </div>
+          <div class="doc-line-actions-v716">
+            ${link ? `<a class="primary tiny" href="${escapeAttr(link)}" target="_blank" rel="noopener">Abrir</a>` : `<button class="primary tiny" data-open-drive-folder-doc="${doc.id}">Vincular</button>`}
+            <details class="more-actions-v715 more-actions-v716">
+              <summary>Mais</summary>
+              <div>
+                <button class="ghost tiny" data-edit-doc="${doc.id}">Editar</button>
+                <button class="ghost tiny" data-open-drive-folder-doc="${doc.id}">Abrir pasta</button>
+                ${!link ? `<button class="ghost tiny" data-search-drive-doc="${doc.id}">Buscar no Drive</button><button class="ghost tiny" data-paste-drive-link="${doc.id}">Colar link</button>` : ""}
+                ${doc.file && doc.file.dataUrl && cloudConfigured() && !doc.driveFileId && !isLargeFileV710(doc.file) ? `<button class="ghost tiny" data-upload-drive="${doc.id}">Enviar Drive</button>` : ""}
+                ${doc.file && doc.file.dataUrl ? `<button class="ghost tiny" data-download-doc="${doc.id}">Baixar local</button>` : ""}
+                <button class="ghost tiny danger" data-delete-doc="${doc.id}">Excluir</button>
+              </div>
+            </details>
+          </div>
+        </article>`;
+      }).join("") : `<div class="empty-state compact-empty-v712">Nenhum documento cadastrado. Clique em <strong>+ Enviar documento</strong> para começar.</div>`}
+    </div>
+  </div>`;
+
+  document.querySelectorAll("[data-new-doc-v716]").forEach(el => el.onclick = () => openDocumentModal());
+  document.querySelectorAll("[data-doc-folder-jump-v716]").forEach(el => el.onclick = () => {
+    const folder = el.dataset.docFolderJumpV716;
+    const target = document.querySelector(`[data-doc-row-folder-v716="${CSS.escape(folder)}"]`);
+    if(target){ target.scrollIntoView({ behavior:"smooth", block:"center" }); target.classList.add("pulse-v79"); setTimeout(() => target.classList.remove("pulse-v79"), 900); }
+    else showToast("Ainda não há arquivos nessa pasta");
+  });
+  document.querySelectorAll("[data-doc-filter-v716]").forEach(el => el.onclick = () => {
+    const mode = el.dataset.docFilterV716;
+    const rows = [...document.querySelectorAll(".doc-line-v716")];
+    rows.forEach(row => {
+      row.hidden = mode === "drive" ? row.dataset.docHasLinkV716 !== "yes" : mode === "pending" ? row.dataset.docHasLinkV716 === "yes" : false;
+    });
+  });
+  document.querySelectorAll("[data-edit-doc]").forEach(el => el.onclick = () => openDocumentModal(data.documents.find(d => d.id === el.dataset.editDoc)));
+  document.querySelectorAll("[data-delete-doc]").forEach(el => el.onclick = () => deleteItem("documents", el.dataset.deleteDoc, "Excluir documento?"));
+  document.querySelectorAll("[data-download-doc]").forEach(el => el.onclick = () => downloadDocumentFile(el.dataset.downloadDoc));
+  document.querySelectorAll("[data-upload-drive]").forEach(el => el.onclick = () => uploadDocumentToDrive(el.dataset.uploadDrive));
+  document.querySelectorAll("[data-open-drive-folder-doc]").forEach(el => el.onclick = () => openDriveFolderForDocumentV710(el.dataset.openDriveFolderDoc));
+  document.querySelectorAll("[data-search-drive-doc]").forEach(el => el.onclick = () => searchRecentDriveFilesForDocumentV710(el.dataset.searchDriveDoc));
+  document.querySelectorAll("[data-paste-drive-link]").forEach(el => el.onclick = () => promptDriveLinkForDocumentV710(el.dataset.pasteDriveLink));
+}
+
+/* ===== v7.17 — inspiração Notion: views, inbox e organização rápida ===== */
+window.docViewFilterV717 = window.docViewFilterV717 || "all";
+window.docFolderFilterV717 = window.docFolderFilterV717 || "all";
+
+function normalizeDateForInputV717(value){
+  if(!value) return "";
+  const s = String(value).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) return s;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
+  if(m){
+    const y = Number(m[3] || data.trip.year || new Date().getFullYear());
+    return `${y}-${String(Number(m[2])).padStart(2,"0")}-${String(Number(m[1])).padStart(2,"0")}`;
+  }
+  return "";
+}
+function addOneDayIsoV717(iso){
+  if(!iso) return "";
+  const d = new Date(iso + "T12:00:00");
+  if(isNaN(d.getTime())) return "";
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function toTripDateV717(iso){
+  if(!iso) return "";
+  const d = new Date(iso + "T12:00:00");
+  if(isNaN(d.getTime())) return "";
+  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+function nextTemplateDateV717(){
+  const sorted = sortedDays();
+  const last = sorted[sorted.length - 1];
+  const base = normalizeDateForInputV717(last?.date || data.trip.startDate || data.trip.start || "");
+  return last ? addOneDayIsoV717(base) : base;
+}
+function templateDefinitionsV717(){
+  return {
+    deslocamento:{ label:"Dia de deslocamento", city:"Deslocamento", title:"Deslocamento", morning:"Checkout, documentos, malas e deslocamento até o ponto de saída.", afternoon:"Viagem/deslocamento. Guardar comprovantes e localizadores.", night:"Chegada, check-in e jantar leve.", notes:"Dia com ritmo leve para evitar correria." },
+    buenos:{ label:"Dia em Buenos Aires", city:"Buenos Aires", title:"Buenos Aires leve", morning:"Café e passeio próximo ao hotel.", afternoon:"Bairro/ponto turístico principal do dia.", night:"Jantar reservado ou restaurante próximo.", notes:"Intercalar passeio com pausa para o Oliver." },
+    mendoza:{ label:"Dia em Mendoza", city:"Mendoza", title:"Mendoza", morning:"Café, deslocamento curto e passeio leve.", afternoon:"Parque, centro ou experiência programada.", night:"Jantar tranquilo e organização do dia seguinte.", notes:"Manter margem para deslocamentos e descanso." },
+    vinicola:{ label:"Dia de vinícola", city:"Mendoza", title:"Vinícolas", morning:"Saída sem pressa, deslocamento para vinícola e primeira experiência.", afternoon:"Almoço/degustação com reserva e retorno com folga.", night:"Jantar leve ou descanso no hotel.", notes:"Confirmar reserva, transporte, horários e política para criança." },
+    fronteira:{ label:"Fronteira/documentos", city:"Puerto Iguazú", title:"Fronteira e documentos", morning:"Conferir RG/passaporte, autorizações, seguro e comprovantes.", afternoon:"Deslocamento entre Brasil/Argentina com tempo de margem.", night:"Check-in, câmbio básico e jantar leve.", notes:"Atenção a documentos do Oliver e comprovantes de hospedagem/seguro." }
+  };
+}
+function createDayFromTemplateV717(key){
+  const tpl = templateDefinitionsV717()[key];
+  if(!tpl) return;
+  const number = Math.max(0, ...data.days.map(d => Number(d.number || 0))) + 1;
+  const iso = nextTemplateDateV717();
+  const date = toTripDateV717(iso);
+  const day = {
+    id: uid(),
+    number,
+    label: date ? date : `Dia ${String(number).padStart(2,"0")}`,
+    date,
+    title: tpl.title,
+    city: tpl.city,
+    morning: tpl.morning,
+    afternoon: tpl.afternoon,
+    night: tpl.night,
+    lodging:"",
+    transport:"",
+    notes: tpl.notes
+  };
+  data.days.push(day);
+  saveAndRender(`${tpl.label} criado`);
+  setView("itinerary");
+  setTimeout(() => document.querySelector(`[data-day-card="${CSS.escape(day.id)}"]`)?.scrollIntoView({behavior:"smooth", block:"center"}), 120);
+}
+function installDayTemplatesV717(){
+  const list = byId("itineraryList");
+  if(!list || list.querySelector(".day-template-bar-v717")) return;
+  list.insertAdjacentHTML("afterbegin", `<div class="day-template-bar-v717">
+    <strong>Templates rápidos:</strong>
+    <button type="button" class="template-btn-v717" data-template-day-v717="deslocamento">+ Deslocamento</button>
+    <button type="button" class="template-btn-v717" data-template-day-v717="buenos">+ Buenos Aires</button>
+    <button type="button" class="template-btn-v717" data-template-day-v717="mendoza">+ Mendoza</button>
+    <button type="button" class="template-btn-v717" data-template-day-v717="vinicola">+ Vinícola</button>
+    <button type="button" class="template-btn-v717" data-template-day-v717="fronteira">+ Fronteira</button>
+  </div>`);
+  list.querySelectorAll("[data-template-day-v717]").forEach(btn => btn.onclick = () => createDayFromTemplateV717(btn.dataset.templateDayV717));
+}
+function openDayPageV717(dayId){
+  const day = data.days.find(d => d.id === dayId);
+  if(!day) return;
+  const places = data.places.filter(p => p.dayId === day.id);
+  const docs = data.documents.filter(d => d.dayId === day.id);
+  const reservations = data.reservations.filter(r => r.dayId === day.id || (r.date && r.date === day.date));
+  openModal(`Página do dia · ${dayLabel(day.id)}`, `<div class="day-page-v717">
+    <div class="tip-box"><strong>${escapeHtml(day.title || "Dia da viagem")}</strong><br>${escapeHtml(day.city || "Etapa")} · ${escapeHtml(day.date || "Sem data")}${day.notes ? `<br>${escapeHtml(day.notes)}` : ""}</div>
+    <div class="day-page-grid-v717">
+      <div class="day-page-block-v717"><strong>☀️ Manhã</strong>${escapeHtml(day.morning || "A definir.")}</div>
+      <div class="day-page-block-v717"><strong>🌤️ Tarde</strong>${escapeHtml(day.afternoon || "A definir.")}</div>
+      <div class="day-page-block-v717"><strong>🌙 Noite</strong>${escapeHtml(day.night || "A definir.")}</div>
+    </div>
+    <div class="day-linked-list-v717">
+      <strong>Lugares, reservas e documentos vinculados</strong>
+      ${places.map(p => `<button type="button" class="ghost" data-day-page-place-v717="${p.id}">📍 ${escapeHtml(p.name)} · ${escapeHtml(p.city || "")}</button>`).join("")}
+      ${reservations.map(r => `<button type="button" class="ghost" data-day-page-res-v717="${r.id}">🎫 ${escapeHtml(r.title)} · ${escapeHtml(r.status || "")}</button>`).join("")}
+      ${docs.map(d => documentDriveUrlV710(d) ? `<a class="ghost" href="${escapeAttr(documentDriveUrlV710(d))}" target="_blank" rel="noopener">📎 ${escapeHtml(d.title || d.file?.name || "Documento")}</a>` : `<button type="button" class="ghost" data-day-page-doc-v717="${d.id}">📎 ${escapeHtml(d.title || "Documento")} · sem link</button>`).join("")}
+      ${(!places.length && !reservations.length && !docs.length) ? `<div class="empty-state compact-empty-v712">Nada vinculado a este dia ainda.</div>` : ""}
+    </div>
+  </div>`, () => { closeModal(); openDayModal(day); });
+  byId("modalSubmit").textContent = "Editar dia";
+  document.querySelectorAll("[data-day-page-place-v717]").forEach(el => el.onclick = () => { closeModal(); setView("places"); setTimeout(() => selectPlace(el.dataset.dayPagePlaceV717), 120); });
+  document.querySelectorAll("[data-day-page-res-v717]").forEach(el => el.onclick = () => { closeModal(); openReservationModal(data.reservations.find(r => r.id === el.dataset.dayPageResV717)); });
+  document.querySelectorAll("[data-day-page-doc-v717]").forEach(el => el.onclick = () => { closeModal(); openDocumentModal(data.documents.find(d => d.id === el.dataset.dayPageDocV717)); });
+}
+function installDayPageButtonsV717(){
+  document.querySelectorAll("[data-day-card]").forEach(card => {
+    const id = card.dataset.dayCard;
+    const actions = card.querySelector(".day-actions-v71, .day-actions-v70, .card-actions");
+    if(actions && !actions.querySelector("[data-day-page-v717]")){
+      actions.insertAdjacentHTML("afterbegin", `<button class="secondary tiny" data-day-page-v717="${escapeAttr(id)}">Abrir dia</button>`);
+    }
+  });
+  document.querySelectorAll("[data-day-page-v717]").forEach(btn => btn.onclick = () => openDayPageV717(btn.dataset.dayPageV717));
+}
+const renderItineraryBaseV717 = renderItinerary;
+renderItinerary = function(){
+  renderItineraryBaseV717();
+  installDayTemplatesV717();
+  installDayPageButtonsV717();
+};
+
+function inboxItemsV717(){
+  const items = [];
+  (data.places || []).filter(p => !p.dayId).slice(0,3).forEach(p => items.push({ icon:"📍", title:p.name || "Lugar sem nome", detail:`${p.city || "Sem cidade"} · sem dia definido`, action:"places", id:p.id }));
+  (data.documents || []).filter(d => !(d.driveFileId || d.link)).slice(0,3).forEach(d => items.push({ icon:"📎", title:d.title || d.file?.name || "Documento sem link", detail:`${docFolderShortNameV716 ? docFolderShortNameV716(docFolderForV79(d)) : (d.category || "Documento")} · sem link/Drive`, action:"documents", id:d.id }));
+  (data.reservations || []).filter(r => !r.date && !r.dayId).slice(0,2).forEach(r => items.push({ icon:"🎫", title:r.title || "Reserva sem data", detail:`${r.type || "Reserva"} · sem data/dia`, action:"reservations", id:r.id }));
+  (data.tasks || []).filter(t => !t.done && t.critical).slice(0,2).forEach(t => items.push({ icon:"✅", title:t.title || "Pendência crítica", detail:"pendência crítica aberta", action:"tasks", id:t.id }));
+  return items.slice(0,6);
+}
+function appendInboxOverviewV717(){
+  const host = byId("overviewContent");
+  if(!host || host.querySelector(".inbox-v717")) return;
+  const items = inboxItemsV717();
+  host.insertAdjacentHTML("beforeend", `<section class="inbox-v717">
+    <div class="inbox-head-v717">
+      <div><span class="pill">A organizar</span><h3>Caixa de entrada da viagem</h3><p>Lugares sem dia, documentos sem link e reservas sem data aparecem aqui para você organizar depois.</p></div>
+      <button class="secondary tiny" data-open-inbox-docs-v717>Ver documentos</button>
+    </div>
+    ${items.length ? `<div class="inbox-list-v717">${items.map(item => `<button type="button" class="inbox-item-v717" data-inbox-action-v717="${escapeAttr(item.action)}" data-inbox-id-v717="${escapeAttr(item.id)}"><span class="ico">${item.icon}</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></span><em>Organizar</em></button>`).join("")}</div>` : `<div class="inbox-empty-v717">Tudo organizado por enquanto. Nenhum item solto encontrado.</div>`}
+  </section>`);
+  host.querySelector("[data-open-inbox-docs-v717]")?.addEventListener("click", () => { setView("documents"); window.docViewFilterV717 = "inbox"; setTimeout(renderDocuments, 50); });
+  host.querySelectorAll("[data-inbox-action-v717]").forEach(btn => btn.onclick = () => {
+    const action = btn.dataset.inboxActionV717;
+    const id = btn.dataset.inboxIdV717;
+    if(action === "places"){ setView("places"); setTimeout(() => selectPlace(id), 120); }
+    else if(action === "documents"){ setView("documents"); setTimeout(() => { window.docViewFilterV717 = "inbox"; renderDocuments(); }, 80); }
+    else if(action === "reservations"){ openReservationModal(data.reservations.find(r => r.id === id)); }
+    else if(action === "tasks"){ openTaskModal(data.tasks.find(t => t.id === id)); }
+  });
+}
+const renderOverviewBaseV717 = renderOverview;
+renderOverview = function(){
+  renderOverviewBaseV717();
+  appendInboxOverviewV717();
+};
+
+function documentMatchesViewV717(doc){
+  const hasLink = !!(doc.driveFileId || doc.link);
+  const view = window.docViewFilterV717 || "all";
+  if(view === "drive") return hasLink;
+  if(view === "pending") return !hasLink;
+  if(view === "inbox") return !hasLink || !doc.dayId;
+  return true;
+}
+function documentMatchesFolderV717(doc){
+  const folder = window.docFolderFilterV717 || "all";
+  if(folder === "all") return true;
+  return docFolderForV79(doc) === folder;
+}
+function renderDocuments(){
+  const folders = docFolderDefinitionsV79();
+  const docs = data.documents || [];
+  const filteredDocs = docs.filter(d => documentMatchesViewV717(d) && documentMatchesFolderV717(d));
+  const stats = documentStatsV712();
+  const inboxCount = docs.filter(d => !d.dayId || !(d.driveFileId || d.link)).length;
+  const folderCounts = new Map(folders.map(f => [f.folder, 0]));
+  docs.forEach(d => folderCounts.set(docFolderForV79(d), (folderCounts.get(docFolderForV79(d)) || 0) + 1));
+
+  const viewButton = (mode, label, count) => `<button type="button" class="${(window.docViewFilterV717 || "all") === mode ? "active" : ""}" data-doc-view-v717="${mode}"><strong>${count}</strong> ${label}</button>`;
+  byId("documentsList").innerHTML = `<div class="documents-database-v717">
+    <div class="docs-hero-db-v717">
+      <div><span class="pill">Arquivos</span><h3>Documentos da viagem</h3><p>Visão rápida tipo lista: envie, vincule, abra e corrija documentos sem sair da tela.</p></div>
+      <div class="docs-actions-v717"><button class="primary" data-new-doc-v717>+ Enviar documento</button></div>
+    </div>
+    <div class="doc-view-tabs-v717" aria-label="Visualizações de documentos">
+      ${viewButton("all", "todos", stats.total)}
+      ${viewButton("pending", "pendentes", stats.pending)}
+      ${viewButton("drive", "com link", stats.drive)}
+      ${viewButton("inbox", "a organizar", inboxCount)}
+    </div>
+    <div class="doc-folder-tabs-v717" aria-label="Filtros por pasta">
+      <button type="button" class="${(window.docFolderFilterV717 || "all") === "all" ? "active" : ""}" data-doc-folder-v717="all">🗂️ Todas <small>${docs.length}</small></button>
+      ${folders.map(f => `<button type="button" class="${window.docFolderFilterV717 === f.folder ? "active" : ""}" data-doc-folder-v717="${escapeAttr(f.folder)}"><span>${f.icon}</span>${escapeHtml(f.folder)} <small>${folderCounts.get(f.folder) || 0}</small></button>`).join("")}
+    </div>
+    <div class="doc-table-db-v717">
+      <div class="doc-table-head-v717"><span>Documento</span><span>Pasta</span><span>Dia</span><span>Status</span><span>Ações</span></div>
+      ${filteredDocs.length ? filteredDocs.map(doc => {
+        const folder = docFolderForV79(doc);
+        const link = documentDriveUrlV710(doc);
+        const title = doc.title || doc.file?.name || "Documento da viagem";
+        const linkState = docLinkStateLabelV716 ? docLinkStateLabelV716(doc) : (link ? "Com link" : "Sem link");
+        const stateClass = docStatusClassV716 ? docStatusClassV716(doc) : (link ? "ok" : "pending");
+        return `<article class="doc-table-row-v717" data-doc-id-v717="${escapeAttr(doc.id)}">
+          <div class="doc-name-v717"><span class="doc-ico-v717">📎</span><span><strong title="${escapeAttr(title)}">${escapeHtml(title)}</strong><small>${escapeHtml(linkState)}</small></span></div>
+          <div class="doc-folder-v717">${escapeHtml(folder)}</div>
+          <div class="doc-day-v717">${escapeHtml(shortDocDayLabelV715(doc.dayId))}</div>
+          <div class="doc-link-v717"><span class="tag ${doc.status === "Concluído" ? "ok" : "pending"}">${escapeHtml(doc.status || "Pendente")}</span></div>
+          <div class="doc-actions-v717">
+            ${link ? `<a class="primary tiny" href="${escapeAttr(link)}" target="_blank" rel="noopener">Abrir</a>` : `<button class="primary tiny" data-open-drive-folder-doc="${doc.id}">Vincular</button>`}
+            <details><summary>Mais</summary><div class="more-menu-v717">
+              <button class="ghost tiny" data-edit-doc="${doc.id}">Editar</button>
+              <button class="ghost tiny" data-open-drive-folder-doc="${doc.id}">Abrir pasta</button>
+              ${!link ? `<button class="ghost tiny" data-search-drive-doc="${doc.id}">Buscar no Drive</button><button class="ghost tiny" data-paste-drive-link="${doc.id}">Colar link</button>` : ""}
+              ${doc.file && doc.file.dataUrl && cloudConfigured() && !doc.driveFileId && !isLargeFileV710(doc.file) ? `<button class="ghost tiny" data-upload-drive="${doc.id}">Enviar Drive</button>` : ""}
+              ${doc.file && doc.file.dataUrl ? `<button class="ghost tiny" data-download-doc="${doc.id}">Baixar local</button>` : ""}
+              <button class="ghost tiny danger" data-delete-doc="${doc.id}">Excluir</button>
+            </div></details>
+          </div>
+        </article>`;
+      }).join("") : `<div class="doc-empty-db-v717">Nenhum documento nesta visualização.</div>`}
+    </div>
+  </div>`;
+
+  document.querySelectorAll("[data-new-doc-v717]").forEach(el => el.onclick = () => openDocumentModal());
+  document.querySelectorAll("[data-doc-view-v717]").forEach(el => el.onclick = () => { window.docViewFilterV717 = el.dataset.docViewV717; renderDocuments(); });
+  document.querySelectorAll("[data-doc-folder-v717]").forEach(el => el.onclick = () => { window.docFolderFilterV717 = el.dataset.docFolderV717; renderDocuments(); });
+  document.querySelectorAll("[data-edit-doc]").forEach(el => el.onclick = () => openDocumentModal(data.documents.find(d => d.id === el.dataset.editDoc)));
+  document.querySelectorAll("[data-delete-doc]").forEach(el => el.onclick = () => deleteItem("documents", el.dataset.deleteDoc, "Excluir documento?"));
+  document.querySelectorAll("[data-download-doc]").forEach(el => el.onclick = () => downloadDocumentFile(el.dataset.downloadDoc));
+  document.querySelectorAll("[data-upload-drive]").forEach(el => el.onclick = () => uploadDocumentToDrive(el.dataset.uploadDrive));
+  document.querySelectorAll("[data-open-drive-folder-doc]").forEach(el => el.onclick = () => openDriveFolderForDocumentV710(el.dataset.openDriveFolderDoc));
+  document.querySelectorAll("[data-search-drive-doc]").forEach(el => el.onclick = () => searchRecentDriveFilesForDocumentV710(el.dataset.searchDriveDoc));
+  document.querySelectorAll("[data-paste-drive-link]").forEach(el => el.onclick = () => promptDriveLinkForDocumentV710(el.dataset.pasteDriveLink));
+}
+
+const renderAllBaseV717 = renderAll;
+renderAll = function(){
+  renderAllBaseV717();
+  if(currentViewNameV712 && currentViewNameV712() === "overview") appendInboxOverviewV717();
+};

@@ -1,16 +1,18 @@
-# Central de Viagem — v7.12 Telas focadas por menu
+# Central de Viagem — v7.13 Home executiva limpa
 
-Versão focada em reduzir rolagem e redundância visual.
+Versão focada em hierarquia, fluidez e redução de poluição visual na tela inicial.
 
 ## O que mudou
 
-- O hero grande e os cards globais aparecem apenas na tela **Início**.
-- Menus internos agora mostram só o conteúdo daquele menu.
-- **Documentos** ganhou tela dedicada, sem mapa lateral e sem indicadores globais.
-- Documentos agora aparecem em painel compacto por pastas, com lista horizontal/gerenciável.
-- Backup, importação e reset continuam em **Configurações > Avançado e backup**.
-- Mantida a integração Google Sheets / Apps Script e upload em subpastas do Drive.
+- Home com cabeçalho mais compacto.
+- Indicadores superiores em faixa baixa e mais objetiva.
+- Tela inicial focada em apenas três decisões: próximo dia, pendências críticas e mapa resumido.
+- Checklist da Home simplificado, com detalhes completos recolhidos.
+- Sidebar de dias aparece apenas no Roteiro, reduzindo ruído visual nas outras telas.
+- Mapa da Home mais compacto; mapa completo segue em Lugares/Roteiro.
+- Menos rolagem vertical e menos redundância.
+- Mantém integração Google Sheets / Apps Script / Drive já validada.
 
 ## Como subir
 
-Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
+Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5.

@@ -4418,3 +4418,136 @@ renderAll = function(){
   applyFocusedShellV712(currentViewNameV712());
 };
 setTimeout(() => applyFocusedShellV712(currentViewNameV712()), 0);
+
+
+/* ===== v7.13 — Home executiva limpa, hierarquia e fluidez ===== */
+function periodTextV713(day, key){
+  const value = day ? (day[key] || "") : "";
+  return value ? escapeHtml(value) : "A definir.";
+}
+function homeCityMiniRowsV713(){
+  const rows = uniqueCities().map(city => ({
+    city,
+    places: data.places.filter(p => canonicalizeCityV68(p.city) === city).length,
+    reservations: data.reservations.filter(r => canonicalizeCityV68(r.city) === city).length
+  })).filter(r => r.places || r.reservations).slice(0,3);
+  return rows;
+}
+function applyHomeShellV713(view = currentViewNameV712()){
+  document.body.classList.add("home-exec-v713");
+  document.body.classList.toggle("home-view-v713", view === "overview");
+}
+const applyFocusedShellBaseV713 = applyFocusedShellV712;
+applyFocusedShellV712 = function(view = currentViewNameV712()){
+  applyFocusedShellBaseV713(view);
+  applyHomeShellV713(view);
+};
+
+function renderOverview(){
+  canonicalizeDataSetV68(false);
+  const done = data.tasks.filter(t => t.done).length;
+  const openTasks = data.tasks.filter(t => !t.done);
+  const critical = openTasks.filter(t => t.critical);
+  const pending = openTasks.filter(t => !t.critical);
+  const pct = data.tasks.length ? Math.round(done / data.tasks.length * 100) : 0;
+  const nextDay = sortedDays()[0];
+  const topCritical = critical.slice(0, 2);
+  const fallbackPending = topCritical.length < 2 ? pending.slice(0, 2 - topCritical.length) : [];
+  const topTasks = [...topCritical, ...fallbackPending];
+  const hiddenOpenCount = Math.max(0, openTasks.length - topTasks.length);
+  const testCount = testDataCountV68();
+  const cityMini = homeCityMiniRowsV713();
+
+  byId("overviewContent").innerHTML = `
+    <div class="home-exec-v713-grid">
+      <article class="home-card-v713 next-day-v713">
+        <div class="home-card-head-v713">
+          <span class="pill">Próximo dia</span>
+          <button class="secondary tiny" data-go-itinerary-v713>Ver roteiro</button>
+        </div>
+        ${nextDay ? `
+          <h3>${escapeHtml(dayLabel(nextDay.id))}</h3>
+          <p class="home-sub-v713">${escapeHtml(nextDay.title || "Dia da viagem")} · ${escapeHtml(canonicalizeCityV68(nextDay.city) || "Etapa")}</p>
+          <div class="day-mini-plan-v713">
+            <div><strong>☀️ Manhã</strong><span>${periodTextV713(nextDay,"morning")}</span></div>
+            <div><strong>🌤️ Tarde</strong><span>${periodTextV713(nextDay,"afternoon")}</span></div>
+            <div><strong>🌙 Noite</strong><span>${periodTextV713(nextDay,"night")}</span></div>
+          </div>
+          <div class="home-actions-v713">
+            <button class="primary tiny" data-edit-next-day-v713="${nextDay.id}">Editar dia</button>
+            <button class="ghost tiny" data-go-itinerary-v713>Roteiro completo</button>
+          </div>` : `
+          <div class="empty-state compact-empty-v712">Nenhum dia cadastrado. Clique em <strong>+ Dia</strong> para começar.</div>`}
+      </article>
+
+      <article class="home-card-v713 tasks-home-v713">
+        <div class="home-card-head-v713">
+          <span class="pill">Pendências</span>
+          ${testCount ? `<button class="ghost tiny danger" data-clean-test-v68>Limpar testes (${testCount})</button>` : `<button class="secondary tiny" data-new-task-v713>+ Pendência</button>`}
+        </div>
+        <div class="home-task-stats-v713">
+          <span><strong>${critical.length}</strong><small>críticas</small></span>
+          <span><strong>${pending.length}</strong><small>pendentes</small></span>
+          <span><strong>${done}</strong><small>concluídas</small></span>
+        </div>
+        <div class="progress-bar home-progress-v713"><span style="width:${pct}%"></span></div>
+        <div class="priority-list-v713">
+          ${topTasks.map(task => `
+            <label class="priority-task-v713 ${task.critical ? "critical" : ""}">
+              <input type="checkbox" ${task.done ? "checked" : ""} data-task-toggle="${task.id}" />
+              <span><strong>${escapeHtml(task.title)}</strong>${task.description ? `<small>${escapeHtml(task.description)}</small>` : ""}</span>
+              <em>${task.critical ? "Crítico" : "Pendente"}</em>
+            </label>`).join("") || `<div class="empty-state compact-empty-v712">Nenhuma pendência aberta.</div>`}
+        </div>
+        <details class="details-compact-v68 home-details-v713">
+          <summary>${hiddenOpenCount ? `Ver ${hiddenOpenCount} pendência(s) a mais` : "Ver / editar todas"}</summary>
+          <div class="task-list task-list-v69-full">
+            ${data.tasks.map(task => `
+              <div class="task-item task-item-v69">
+                <input type="checkbox" ${task.done ? "checked" : ""} data-task-toggle="${task.id}" />
+                <div>
+                  <strong>${escapeHtml(task.title)}</strong>
+                  <span class="tag ${task.done ? "ok" : task.critical ? "critical" : "pending"}">${task.done ? "Concluído" : task.critical ? "Crítico" : "Pendente"}</span>
+                  ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+                  <div class="card-actions">
+                    <button class="ghost tiny" data-edit-task="${task.id}">Editar</button>
+                    <button class="ghost tiny danger" data-delete-task="${task.id}">Excluir</button>
+                  </div>
+                </div>
+              </div>`).join("") || `<div class="empty-state">Nenhuma pendência cadastrada.</div>`}
+          </div>
+        </details>
+      </article>
+
+      <article class="home-card-v713 home-summary-v713">
+        <div class="home-card-head-v713">
+          <span class="pill">Resumo rápido</span>
+          <button class="ghost tiny" data-go-places-v713>Ver lugares</button>
+        </div>
+        <p><strong>Pessoas:</strong> ${escapeHtml(data.trip.people || "—")}</p>
+        <div class="home-city-pills-v713">
+          ${cityMini.map(row => `<button type="button" data-go-places-city-v713="${escapeAttr(row.city)}"><strong>${escapeHtml(row.city)}</strong><small>${row.places} lugar(es) · ${row.reservations} reserva(s)</small></button>`).join("") || `<span class="muted">Cadastre lugares para montar o resumo.</span>`}
+        </div>
+      </article>
+    </div>`;
+
+  document.querySelectorAll("[data-task-toggle]").forEach(el => el.onchange = () => {
+    const task = data.tasks.find(t => t.id === el.dataset.taskToggle);
+    if(task){ task.done = el.checked; saveAndRender("Pendência atualizada"); }
+  });
+  document.querySelectorAll("[data-edit-task]").forEach(el => el.onclick = () => openTaskModal(data.tasks.find(t => t.id === el.dataset.editTask)));
+  document.querySelectorAll("[data-delete-task]").forEach(el => el.onclick = () => deleteItem("tasks", el.dataset.deleteTask, "Excluir esta pendência?"));
+  document.querySelector("[data-clean-test-v68]")?.addEventListener("click", cleanTestDataV68);
+  document.querySelectorAll("[data-go-itinerary-v713]").forEach(el => el.onclick = () => setView("itinerary"));
+  document.querySelector("[data-edit-next-day-v713]")?.addEventListener("click", e => openDayModal(data.days.find(d => d.id === e.currentTarget.dataset.editNextDayV713)));
+  document.querySelector("[data-new-task-v713]")?.addEventListener("click", () => openTaskModal());
+  document.querySelector("[data-go-places-v713]")?.addEventListener("click", () => setView("places"));
+  document.querySelectorAll("[data-go-places-city-v713]").forEach(el => el.onclick = () => { setView("places"); setTimeout(() => { const city = byId("filterCity"); if(city){ city.value = el.dataset.goPlacesCityV713; renderPlaces(); } }, 80); });
+}
+
+const renderAllBaseV713 = renderAll;
+renderAll = function(){
+  renderAllBaseV713();
+  applyHomeShellV713(currentViewNameV712());
+};
+setTimeout(() => applyHomeShellV713(currentViewNameV712()), 0);

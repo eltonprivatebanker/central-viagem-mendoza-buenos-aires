@@ -1,7 +1,7 @@
 
 /**
  * Central de Viagem — Backend Google Sheets + Drive + Agenda
- * Versão v7.6 — JSONP/CORS + upload automático em subpastas do Drive
+ * Versão v7.10 — upload automático + arquivos grandes via Drive
  *
  * Como usar:
  * 1) Crie uma Planilha Google chamada "Central de Viagem".
@@ -53,6 +53,8 @@ function handleRequest_(e, method) {
     if (action === 'getAll') return json_({ ok: true, data: readAll_() }, callback);
     if (action === 'createCalendarEvent') return json_(createCalendarEvent_(payload.event, payload.settings || {}, payload.trip || {}), callback);
     if (action === 'uploadFile') return json_(uploadFile_(payload), callback);
+    if (action === 'getUploadFolder') return json_(getUploadFolderInfo_(payload), callback);
+    if (action === 'listDriveFiles') return json_(listDriveFiles_(payload), callback);
 
     throw new Error('Ação não reconhecida: ' + action);
   } catch (err) {
@@ -170,6 +172,46 @@ function uploadFile_(payload) {
 
   log_('uploadFile', payload.fileName + ' → ' + folderName);
   return result;
+}
+
+
+function getUploadFolderInfo_(payload) {
+  const folderId = payload.folderId || readConfig_('drive_folder_id_frontend') || '';
+  const rootFolder = folderId ? DriveApp.getFolderById(folderId) : DriveApp.getRootFolder();
+  const targetFolder = getUploadTargetFolder_(rootFolder, payload || {});
+  return {
+    ok: true,
+    folderId: targetFolder.getId(),
+    folderName: targetFolder.getName(),
+    folderUrl: targetFolder.getUrl()
+  };
+}
+
+function listDriveFiles_(payload) {
+  const info = getUploadFolderInfo_(payload || {});
+  const folder = DriveApp.getFolderById(info.folderId);
+  const maxResults = Math.max(1, Math.min(Number(payload.maxResults || 8), 20));
+  const files = [];
+  const it = folder.getFiles();
+  while (it.hasNext()) {
+    const f = it.next();
+    files.push({
+      id: f.getId(),
+      name: f.getName(),
+      url: f.getUrl(),
+      size: Number(f.getSize() || 0),
+      mimeType: f.getMimeType(),
+      updated: f.getLastUpdated() ? f.getLastUpdated().toISOString() : ''
+    });
+  }
+  files.sort(function(a,b){ return String(b.updated).localeCompare(String(a.updated)); });
+  return {
+    ok: true,
+    folderId: info.folderId,
+    folderName: info.folderName,
+    folderUrl: info.folderUrl,
+    files: files.slice(0, maxResults)
+  };
 }
 
 function getUploadTargetFolder_(rootFolder, payload) {

@@ -3695,3 +3695,345 @@ renderAll = function(){
 };
 
 setTimeout(() => applyWorkspaceFocusV79(currentView), 0);
+
+
+/* ===== v7.10 — documentos grandes: abrir subpasta do Drive + link rápido ===== */
+const LARGE_FILE_LIMIT_V710 = 8 * 1024 * 1024;
+function isLargeFileV710(file){ return Boolean(file && file.size > LARGE_FILE_LIMIT_V710); }
+function documentHasUsableLinkV710(doc){ return Boolean(doc && (doc.link || doc.driveFileId)); }
+function documentDriveUrlV710(doc){
+  if(doc?.link) return doc.link;
+  if(doc?.driveFileId) return `https://drive.google.com/file/d/${encodeURIComponent(doc.driveFileId)}/view`;
+  return "";
+}
+function docStatusTextV79(doc){
+  if(doc.driveFileId || doc.link) return `Consulta rápida pronta${doc.driveFolderName ? ` · ${doc.driveFolderName}` : ""}`;
+  if(doc.uploadStatus === "manualDriveNeeded") return `Arquivo grande · enviar manualmente ao Drive`;
+  if(doc.uploadStatus === "uploadingDrive") return `Enviando ao Drive...`;
+  if(doc.uploadStatus === "pendingDrive") return `Envio solicitado · carregar da nuvem em instantes`;
+  if(doc.uploadStatus === "uploadError") return `Erro no envio · tente reenviar`;
+  if(doc.file) return `Arquivo local · falta enviar ao Drive`;
+  return `Pendente`;
+}
+async function getDriveFolderInfoForDocV710(doc){
+  const folderName = expectedDriveFolderV76(doc || {});
+  const fallbackRoot = data.settings.driveFolderUrl || (data.settings.driveFolderId ? `https://drive.google.com/drive/folders/${data.settings.driveFolderId}` : "");
+  if(!cloudConfigured()) return { folderName, folderUrl:fallbackRoot, folderId:data.settings.driveFolderId || "" };
+  try{
+    const json = await cloudRequest("getUploadFolder", {
+      folderId: data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || ""),
+      category: doc?.category || "",
+      fileName: doc?.file?.name || doc?.title || "",
+      documentData: {
+        id: doc?.id || "",
+        title: doc?.title || "",
+        category: doc?.category || "",
+        notes: doc?.notes || ""
+      }
+    });
+    return {
+      folderName: json.folderName || folderName,
+      folderUrl: json.folderUrl || fallbackRoot,
+      folderId: json.folderId || data.settings.driveFolderId || ""
+    };
+  }catch(err){
+    showToast(err.message || "Não consegui localizar a subpasta. Abrindo a pasta principal.");
+    return { folderName, folderUrl:fallbackRoot, folderId:data.settings.driveFolderId || "" };
+  }
+}
+async function openDriveFolderForDocumentV710(idOrDoc){
+  const doc = typeof idOrDoc === "string" ? data.documents.find(d => d.id === idOrDoc) : idOrDoc;
+  if(!doc){ showToast("Documento não encontrado"); return; }
+  const info = await getDriveFolderInfoForDocV710(doc);
+  doc.driveFolderName = info.folderName || doc.driveFolderName || expectedDriveFolderV76(doc);
+  doc.driveFolderId = info.folderId || doc.driveFolderId || "";
+  doc.driveFolderUrl = info.folderUrl || doc.driveFolderUrl || "";
+  saveData();
+  renderAll();
+  if(info.folderUrl){
+    window.open(info.folderUrl, "_blank", "noopener");
+    showToast(`Abra a pasta ${doc.driveFolderName} e arraste o arquivo para lá.`);
+  }else{
+    showToast("Configure a pasta do Google Drive em Configurações.");
+  }
+}
+function promptDriveLinkForDocumentV710(id){
+  const doc = data.documents.find(d => d.id === id);
+  if(!doc) return;
+  const url = prompt("Cole aqui o link do arquivo no Google Drive:", doc.link || "");
+  if(url === null) return;
+  const clean = String(url || "").trim();
+  if(!clean){ showToast("Nenhum link informado."); return; }
+  doc.link = clean;
+  doc.uploadStatus = "linkedDrive";
+  doc.driveFolderName = doc.driveFolderName || expectedDriveFolderV76(doc);
+  doc.file = doc.file ? { name: doc.file.name, size: doc.file.size, type: doc.file.type || "application/octet-stream", localOnly:false, manualDrive:true } : doc.file;
+  saveData();
+  renderAll();
+  saveCloudNow(true);
+  showToast("Link do Drive salvo para consulta rápida.");
+}
+async function searchRecentDriveFilesForDocumentV710(id){
+  const doc = data.documents.find(d => d.id === id);
+  if(!doc){ showToast("Documento não encontrado"); return; }
+  if(!cloudConfigured()){ showToast("Configure a nuvem antes de buscar no Drive."); return; }
+  try{
+    showToast("Buscando arquivos recentes na subpasta do Drive...");
+    const json = await cloudRequest("listDriveFiles", {
+      folderId: data.settings.driveFolderId || extractDriveFolderId(data.settings.driveFolderUrl || ""),
+      category: doc.category || "",
+      fileName: doc.file?.name || doc.title || "",
+      documentData: { id:doc.id, title:doc.title, category:doc.category, notes:doc.notes || "" },
+      maxResults: 8
+    });
+    const files = json.files || [];
+    if(!files.length){
+      showToast("Não encontrei arquivos recentes nessa subpasta. Abra a pasta e depois cole o link manualmente.");
+      return;
+    }
+    const lines = files.map((f,i) => `${i+1}. ${f.name} · ${fileSize(f.size || 0)}`).join("\n");
+    const choice = prompt(`Escolha o número do arquivo para vincular:\n\n${lines}`, "1");
+    if(choice === null) return;
+    const idx = Number(choice) - 1;
+    const picked = files[idx];
+    if(!picked){ showToast("Opção inválida."); return; }
+    doc.link = picked.url;
+    doc.driveFileId = picked.id;
+    doc.driveFolderName = json.folderName || doc.driveFolderName || expectedDriveFolderV76(doc);
+    doc.uploadStatus = "uploadedDrive";
+    doc.file = { name:picked.name, size:picked.size || doc.file?.size || 0, type:picked.mimeType || doc.file?.type || "application/octet-stream", localOnly:false };
+    saveData();
+    renderAll();
+    await saveCloudNow(true);
+    showToast("Arquivo vinculado ao documento.");
+  }catch(err){ showToast(err.message || String(err)); }
+}
+
+openDocumentModal = function(doc=null){
+  const d = doc || { id: uid(), title:"", category:"Documentos pessoais", status:"Pendente", dayId:"", link:"", notes:"", file:null, driveFileId:"", uploadStatus:"", driveFolderName:"" };
+  const initialFolder = folderHintV76(d);
+  const currentFileText = d.driveFileId || d.link
+    ? `☁️ Consulta rápida pronta${d.driveFolderName ? ` · ${escapeHtml(d.driveFolderName)}` : ""}`
+    : d.file
+      ? `📎 ${escapeHtml(d.file.name)} · ${fileSize(d.file.size)}${d.uploadStatus === "manualDriveNeeded" ? " · enviar manualmente" : ""}`
+      : "Nenhum arquivo selecionado";
+  openModal(doc ? "Editar documento" : "Adicionar documento", `<div class="doc-modal-v77 doc-modal-v710">
+    <div class="doc-upload-hero-v77 doc-upload-hero-v710">
+      <div>
+        <strong>1. Escolha o arquivo</strong>
+        <span>Até 8 MB eu envio. Acima disso, abro a subpasta correta do Drive para você arrastar o arquivo.</span>
+      </div>
+      <label class="doc-file-button-v77" for="docFileInputV77">Procurar arquivo</label>
+      <input id="docFileInputV77" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx" />
+    </div>
+
+    <div id="driveUploadPreview" class="doc-file-status-v77"><span>${currentFileText}</span>${documentHasUsableLinkV710(d) ? `<a href="${escapeAttr(documentDriveUrlV710(d))}" target="_blank" rel="noopener">Abrir / baixar</a>` : ""}</div>
+    <div class="doc-destination-v77" id="driveFolderPreviewV76">Destino previsto: ${escapeHtml(initialFolder)}</div>
+    <div id="largeFileActionsV710" class="large-file-actions-v710" style="display:${d.uploadStatus === "manualDriveNeeded" ? "flex" : "none"}">
+      <button class="secondary tiny" type="button" data-open-drive-folder-v710>Abrir pasta correta no Drive</button>
+      <button class="secondary tiny" type="button" data-search-drive-v710>Buscar arquivo enviado</button>
+      <button class="secondary tiny" type="button" data-paste-drive-link-v710>Colar link do Drive</button>
+    </div>
+
+    <div class="doc-quick-grid-v77">
+      ${input("title", "Nome do documento", d.title, "text", 'placeholder="Ex.: Bilhete de viagem"')}
+      ${selectInput("category", "Categoria", d.category, ["Documentos pessoais","Seguro","Hospedagem","Deslocamentos","Passeios","Orçamento","Comprovante","Outro"])}
+      ${selectInput("status", "Status", d.status, ["Pendente","Concluído"])}
+      ${selectInput("dayId", "Dia relacionado", d.dayId, dayOptions(true))}
+    </div>
+
+    <details class="advanced-box doc-advanced-v77">
+      <summary>Mais detalhes opcionais</summary>
+      <div class="advanced-grid form-grid">
+        <div class="full">${input("link", "Link externo / Google Drive", d.link, "url", 'placeholder="Cole aqui o link caso tenha enviado manualmente ao Drive"')}</div>
+        <div class="full">${textarea("notes", "Observações", d.notes)}</div>
+      </div>
+    </details>
+  </div>`, async (fd, form, modalApi={}) => {
+    const fileInput = form.querySelector('input[name="file"]');
+    const preview = form.querySelector('#driveUploadPreview');
+    const file = fileInput?.files?.[0];
+    const payload = {
+      id:d.id,
+      title:fd.get("title").toString().trim(),
+      category:fd.get("category").toString(),
+      status:fd.get("status").toString(),
+      dayId:fd.get("dayId").toString(),
+      link:fd.get("link").toString().trim(),
+      notes:fd.get("notes").toString().trim(),
+      file:d.file || null,
+      driveFileId:d.driveFileId || "",
+      driveFolderName:d.driveFolderName || "",
+      driveFolderId:d.driveFolderId || "",
+      driveFolderUrl:d.driveFolderUrl || "",
+      uploadStatus:d.uploadStatus || ""
+    };
+    if(file && !payload.title) payload.title = documentTitleFromFileV77(file.name) || file.name;
+    if(!payload.title) payload.title = "Documento da viagem";
+    payload.driveFolderName = expectedDriveFolderV76({ ...payload, file: file ? { name:file.name } : payload.file });
+
+    if(file && isLargeFileV710(file)){
+      payload.file = { name:file.name, type:file.type || "application/octet-stream", size:file.size, localOnly:false, manualDrive:true };
+      payload.uploadStatus = payload.link ? "linkedDrive" : "manualDriveNeeded";
+      if(doc) Object.assign(doc, payload); else data.documents.push(payload);
+      const targetId = payload.id;
+      closeModal();
+      saveData();
+      renderAll();
+      scheduleCloudSave();
+      showToast("Arquivo grande: abrindo a subpasta correta do Drive para envio manual.");
+      await openDriveFolderForDocumentV710(targetId);
+      return;
+    }
+
+    if(file){
+      modalApi.setSubmitText?.("Lendo arquivo...");
+      if(preview) preview.innerHTML = `<span>⏳ Lendo ${escapeHtml(file.name)}...</span>`;
+      payload.file = await readFileAsDataUrl(file);
+      payload.driveFileId = "";
+      payload.uploadStatus = cloudConfigured() ? "uploadingDrive" : "localOnly";
+      payload.driveFolderName = expectedDriveFolderV76({ ...payload, file:payload.file });
+      if(preview) preview.innerHTML = `<span>✅ ${escapeHtml(file.name)} pronto. Destino: ${escapeHtml(payload.driveFolderName)}</span>`;
+    }
+    if(doc) Object.assign(doc, payload); else data.documents.push(payload);
+    const targetId = payload.id;
+    closeModal();
+    saveData();
+    renderAll();
+    if(file && cloudConfigured()){
+      showToast(`Enviando arquivo ao Google Drive em ${payload.driveFolderName}. Aguarde...`);
+      await uploadDocumentToDrive(targetId, { auto:true });
+    }else{
+      showToast(payload.link ? "Documento salvo com link para consulta rápida" : (file ? "Documento salvo apenas neste navegador" : "Documento salvo"));
+      scheduleCloudSave();
+    }
+  }, cloudConfigured() ? "Salvar" : "Salvar documento");
+
+  setTimeout(() => {
+    const form = byId("modalForm");
+    const fileInput = form?.querySelector('input[name="file"]');
+    const categoryInput = form?.querySelector('[name="category"]');
+    const titleInput = form?.querySelector('[name="title"]');
+    const preview = form?.querySelector('#driveUploadPreview');
+    const folderPreview = form?.querySelector('#driveFolderPreviewV76');
+    const largeActions = form?.querySelector('#largeFileActionsV710');
+    const submit = byId("modalSubmit");
+    const updateFolder = () => {
+      if(!folderPreview) return;
+      const folder = expectedDriveFolderV76({ category:categoryInput?.value || d.category, title:titleInput?.value || d.title, file:fileInput?.files?.[0] ? { name:fileInput.files[0].name } : d.file, notes:"" });
+      folderPreview.textContent = `Destino previsto: ${folder}`;
+    };
+    form?.querySelector('[data-open-drive-folder-v710]')?.addEventListener("click", () => openDriveFolderForDocumentV710(d));
+    form?.querySelector('[data-search-drive-v710]')?.addEventListener("click", () => searchRecentDriveFilesForDocumentV710(d.id));
+    form?.querySelector('[data-paste-drive-link-v710]')?.addEventListener("click", () => {
+      closeModal();
+      if(!doc) data.documents.push(d);
+      promptDriveLinkForDocumentV710(d.id);
+    });
+    categoryInput?.addEventListener("change", updateFolder);
+    titleInput?.addEventListener("input", updateFolder);
+    if(!fileInput || !preview) return;
+    fileInput.onchange = () => {
+      const file = fileInput.files?.[0];
+      if(!file){ preview.innerHTML = `<span>Nenhum arquivo selecionado</span>`; if(largeActions) largeActions.style.display = "none"; updateFolder(); return; }
+      if(!titleInput.value.trim()) titleInput.value = documentTitleFromFileV77(file.name);
+      const guessed = guessDocCategoryFromFileV77(file.name);
+      if(categoryInput && (!doc || !categoryInput.value || categoryInput.value === "Documentos pessoais")) categoryInput.value = guessed;
+      updateFolder();
+      const folder = expectedDriveFolderV76({ category:categoryInput?.value || d.category, title:titleInput?.value || d.title, file:{ name:file.name } });
+      const isLarge = isLargeFileV710(file);
+      preview.innerHTML = `<span>${isLarge ? "⚠️" : "✅"} ${escapeHtml(file.name)} · ${fileSize(file.size)}</span><small>${isLarge ? `Arquivo grande: vou abrir ${escapeHtml(folder)} no Drive para você arrastar o arquivo.` : (cloudConfigured() ? `Será enviado para ${escapeHtml(folder)}` : "Será salvo somente neste navegador")}</small>`;
+      if(largeActions) largeActions.style.display = isLarge ? "flex" : "none";
+      if(submit) submit.textContent = isLarge ? "Salvar e abrir pasta no Drive" : (cloudConfigured() ? "Salvar e enviar ao Drive" : "Salvar documento");
+      showToast(isLarge ? `Arquivo grande. Ao salvar, vou abrir ${folder} no Drive.` : `Arquivo selecionado. Destino: ${folder}`);
+    };
+    updateFolder();
+  }, 80);
+};
+
+function renderDocuments(){
+  const folders = docFolderDefinitionsV79();
+  const docsByFolder = new Map(folders.map(f => [f.folder, []]));
+  data.documents.forEach(doc => {
+    const folder = docFolderForV79(doc);
+    if(!docsByFolder.has(folder)) docsByFolder.set(folder, []);
+    docsByFolder.get(folder).push(doc);
+  });
+  const totalDocs = data.documents.length;
+  const driveDocs = data.documents.filter(d => d.driveFileId || d.link).length;
+  const pendingDocs = data.documents.filter(d => !d.driveFileId && !d.link).length;
+  byId("documentsList").innerHTML = `<div class="documents-v79 documents-v710">
+    <div class="doc-command-v79">
+      <div>
+        <strong>Documentos organizados por pasta</strong>
+        <span>Arquivo pequeno sobe automático. Arquivo grande abre a subpasta correta do Drive para envio manual.</span>
+      </div>
+      <button class="primary" data-new-doc-v79>+ Enviar documento</button>
+    </div>
+
+    <div class="doc-mini-stats-v79">
+      <span><strong>${totalDocs}</strong> cadastrado(s)</span>
+      <span><strong>${driveDocs}</strong> com link/Drive</span>
+      <span><strong>${pendingDocs}</strong> pendente(s)</span>
+    </div>
+
+    <div class="doc-folder-grid-v79">
+      ${folders.map(f => {
+        const count = (docsByFolder.get(f.folder) || []).length;
+        return `<button class="doc-folder-tile-v79" data-doc-folder-jump="${escapeAttr(f.folder)}" type="button">
+          <span class="doc-folder-icon-v79">${f.icon}</span>
+          <strong>${escapeHtml(f.folder)}</strong>
+          <small>${count} arquivo(s) · ${escapeHtml(f.helper)}</small>
+        </button>`;
+      }).join("")}
+    </div>
+
+    <div class="doc-list-head-v79">
+      <h3>Arquivos cadastrados</h3>
+      <button class="secondary tiny" data-new-doc-v79>+ Documento</button>
+    </div>
+
+    <div class="doc-list-v79">
+      ${data.documents.length ? data.documents.map(doc => {
+        const folder = docFolderForV79(doc);
+        const url = documentDriveUrlV710(doc);
+        return `<article class="doc-row-v79" data-doc-row-folder="${escapeAttr(folder)}">
+          <div class="doc-row-main-v79">
+            <strong>${escapeHtml(doc.title || doc.file?.name || "Documento da viagem")}</strong>
+            <small>${escapeHtml(folder)} · ${escapeHtml(dayLabel(doc.dayId))}</small>
+            <span>${escapeHtml(docStatusTextV79(doc))}</span>
+          </div>
+          <div class="doc-row-tags-v79">
+            <span class="tag blue">${escapeHtml(doc.category || "Documento")}</span>
+            <span class="tag ${doc.status === "Concluído" ? "ok" : "pending"}">${escapeHtml(doc.status || "Pendente")}</span>
+          </div>
+          <div class="doc-row-actions-v79">
+            ${url ? `<a class="ghost tiny" href="${escapeAttr(url)}" target="_blank" rel="noopener">Abrir / baixar</a>` : ""}
+            <button class="ghost tiny" data-edit-doc="${doc.id}">Editar</button>
+            ${!url ? `<button class="ghost tiny" data-open-drive-folder-doc="${doc.id}">Abrir pasta</button>` : ""}
+            ${!url ? `<button class="ghost tiny" data-search-drive-doc="${doc.id}">Buscar no Drive</button>` : ""}
+            ${!url ? `<button class="ghost tiny" data-paste-drive-link="${doc.id}">Colar link</button>` : ""}
+            ${doc.file && doc.file.dataUrl && cloudConfigured() && !doc.driveFileId ? `<button class="ghost tiny" data-upload-drive="${doc.id}">Enviar Drive</button>` : ""}
+            ${doc.file && doc.file.dataUrl ? `<button class="ghost tiny" data-download-doc="${doc.id}">Baixar local</button>` : ""}
+            <button class="ghost tiny danger" data-delete-doc="${doc.id}">Excluir</button>
+          </div>
+        </article>`;
+      }).join("") : `<div class="empty-state">Nenhum documento cadastrado. Clique em + Documento para enviar o primeiro arquivo.</div>`}
+    </div>
+  </div>`;
+
+  document.querySelectorAll("[data-new-doc-v79]").forEach(el => el.onclick = () => openDocumentModal());
+  document.querySelectorAll("[data-doc-folder-jump]").forEach(el => el.onclick = () => {
+    const folder = el.dataset.docFolderJump;
+    const target = document.querySelector(`[data-doc-row-folder="${CSS.escape(folder)}"]`);
+    if(target){ target.scrollIntoView({ behavior:"smooth", block:"center" }); target.classList.add("pulse-v79"); setTimeout(() => target.classList.remove("pulse-v79"), 900); }
+    else showToast("Ainda não há arquivos nessa pasta");
+  });
+  document.querySelectorAll("[data-edit-doc]").forEach(el => el.onclick = () => openDocumentModal(data.documents.find(d => d.id === el.dataset.editDoc)));
+  document.querySelectorAll("[data-delete-doc]").forEach(el => el.onclick = () => deleteItem("documents", el.dataset.deleteDoc, "Excluir documento?"));
+  document.querySelectorAll("[data-download-doc]").forEach(el => el.onclick = () => downloadDocumentFile(el.dataset.downloadDoc));
+  document.querySelectorAll("[data-upload-drive]").forEach(el => el.onclick = () => uploadDocumentToDrive(el.dataset.uploadDrive));
+  document.querySelectorAll("[data-open-drive-folder-doc]").forEach(el => el.onclick = () => openDriveFolderForDocumentV710(el.dataset.openDriveFolderDoc));
+  document.querySelectorAll("[data-search-drive-doc]").forEach(el => el.onclick = () => searchRecentDriveFilesForDocumentV710(el.dataset.searchDriveDoc));
+  document.querySelectorAll("[data-paste-drive-link]").forEach(el => el.onclick = () => promptDriveLinkForDocumentV710(el.dataset.pasteDriveLink));
+}

@@ -1,35 +1,24 @@
-# Instruções — v7.6
+# Central de Viagem — v7.10
 
-## 1. GitHub Pages
+## Atualização obrigatória do Apps Script
 
-Suba todos os arquivos desta pasta na raiz do repositório, substituindo os atuais.
-Depois aguarde o GitHub Pages publicar e use Ctrl+F5.
+Esta versão adiciona suporte a documentos grandes via Google Drive.
 
-## 2. Apps Script
+1. Abra o Apps Script vinculado à planilha.
+2. Substitua todo o `Código.gs` pelo arquivo `google-apps-script/Code.gs`.
+3. Confirme a chave:
 
-Abra o Apps Script da planilha e substitua o conteúdo de `Código.gs` pelo arquivo:
-
-`google-apps-script/Code.gs`
-
-Confirme a chave:
-
-```javascript
+```js
 const API_KEY = 'mendoza-2026-elton-familia';
 ```
 
-Depois faça:
+4. Clique em Salvar.
+5. Vá em **Implantar > Gerenciar implantações > Editar**.
+6. Selecione **Nova versão** e clique em **Implantar**.
+7. Confirme: **Executar como: Eu** e **Quem pode acessar: Qualquer pessoa**.
 
-1. Salvar
-2. Implantar → Gerenciar implantações
-3. Editar implantação atual
-4. Versão → Nova versão
-5. Implantar
+## Fluxo para documentos
 
-Configuração esperada:
-
-- Executar como: Eu
-- Quem pode acessar: Qualquer pessoa
-
-## 3. Drive
-
-A Central vai salvar arquivos automaticamente dentro das subpastas já criadas na pasta principal da viagem. Se alguma subpasta não existir, o Apps Script cria.
+- Até 8 MB: upload automático pela Central.
+- Acima de 8 MB: a Central abre a subpasta correta do Drive para você arrastar o arquivo.
+- Depois use **Buscar no Drive** ou **Colar link** para criar o botão de consulta rápida.

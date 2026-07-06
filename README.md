@@ -1,22 +1,20 @@
-# Central de Viagem — v7.9 Navegação limpa e foco por seção
+# Central de Viagem — v7.10 Documentos grandes via Drive
 
-Versão focada em reduzir redundâncias, melhorar a hierarquia visual e deixar cada tela com uma função clara.
+Versão focada em documentos e anexos grandes.
 
 ## O que mudou
 
-- Mapa aparece apenas onde faz sentido: Início, Roteiro e Lugares.
-- A aba Documentos não mostra mais o mapa lateral, ganhando largura total.
-- Documentos agora aparecem organizados por pastas/categorias do Google Drive.
-- Cards compactos mostram quantos arquivos existem em cada subpasta.
-- Lista de arquivos ficou mais enxuta, com ações rápidas: abrir, editar, enviar Drive e excluir.
-- Botões de backup/importação/reset foram removidos da lateral e ficam em Configurações > Avançado e backup.
-- Botões destrutivos ficaram mais discretos.
-- Navegação ficou mais objetiva: Início, Roteiro, Lugares, Reservas, Documentos, Orçamento e Configurações.
+- Arquivos até 8 MB continuam com envio automático pela Central.
+- Arquivos acima de 8 MB não travam mais em processamento.
+- Para arquivos grandes, a Central abre automaticamente a subpasta correta do Google Drive.
+- Adicionados botões: **Abrir pasta**, **Buscar no Drive** e **Colar link**.
+- Depois do link salvo, o documento aparece com botão **Abrir / baixar** para consulta rápida.
+- Apps Script recebeu ações `getUploadFolder` e `listDriveFiles` para localizar subpastas e arquivos recentes.
 
 ## Como subir
 
-Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5 no navegador.
+Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5.
 
 ## Apps Script
 
-Não é necessário alterar o Apps Script se ele já estiver na versão com upload para subpastas do Drive e `API_KEY` igual à chave configurada na Central.
+Atualize também o `google-apps-script/Code.gs` no Apps Script e publique uma nova versão da implantação.

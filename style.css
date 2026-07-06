@@ -861,3 +861,41 @@ a{color:var(--gold-2);text-decoration:none}.app-shell{display:grid;grid-template
   .doc-command-v79 .primary{width:100%;}
   .doc-folder-grid-v79{grid-template-columns:1fr;}
 }
+
+
+/* ===== v7.10 — documentos grandes: envio manual orientado ===== */
+.doc-modal-v710 .doc-upload-hero-v710{
+  padding: 16px 18px !important;
+  min-height: 74px !important;
+}
+.doc-modal-v710 .doc-upload-hero-v710 span{
+  display:block;
+  max-width: 650px;
+  font-size:.92rem;
+  line-height:1.35;
+}
+.large-file-actions-v710{
+  gap:8px;
+  flex-wrap:wrap;
+  margin: 8px 0 4px;
+  padding: 10px;
+  border:1px dashed rgba(253,201,103,.35);
+  border-radius:16px;
+  background:rgba(253,201,103,.07);
+}
+.documents-v710 .doc-row-actions-v79{
+  gap:6px;
+}
+.documents-v710 .doc-row-actions-v79 .ghost.tiny{
+  white-space:nowrap;
+}
+.doc-file-status-v77 small{
+  display:block;
+  color:var(--muted);
+  font-size:.82rem;
+  line-height:1.25;
+  margin-top:2px;
+}
+@media (min-width: 980px){
+  .doc-modal-v710{max-height: calc(100vh - 150px); overflow:auto;}
+}

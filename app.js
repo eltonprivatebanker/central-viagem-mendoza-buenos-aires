@@ -4287,3 +4287,134 @@ renderPlaces = function(){
   enhancePlaceSearchBarV711();
 };
 
+
+
+/* ===== v7.12 — telas focadas por menu e documentos sem redundância ===== */
+function currentViewNameV712(){ return currentView || "overview"; }
+function applyFocusedShellV712(view = currentViewNameV712()){
+  document.body.classList.remove(
+    "view-overview-v712","view-itinerary-v712","view-places-v712","view-reservations-v712",
+    "view-documents-v712","view-budget-v712","view-settings-v712"
+  );
+  document.body.classList.add(`view-${view}-v712`);
+  document.body.dataset.currentView = view;
+  document.body.classList.toggle("internal-view-v712", view !== "overview");
+}
+
+const setViewBaseV712 = setView;
+setView = function(view){
+  setViewBaseV712(view);
+  applyFocusedShellV712(view);
+};
+
+function documentStatsV712(){
+  const docs = data.documents || [];
+  return {
+    total: docs.length,
+    drive: docs.filter(d => d.driveFileId || d.link).length,
+    pending: docs.filter(d => !(d.driveFileId || d.link)).length,
+    folders: new Set(docs.map(d => docFolderForV79(d))).size
+  };
+}
+function docFolderSummaryV712(folder, docs){
+  const linked = docs.filter(d => d.driveFileId || d.link).length;
+  const pending = docs.length - linked;
+  const suffix = docs.length ? `${docs.length} arquivo(s)${pending ? ` · ${pending} pendente(s)` : ""}` : "Sem arquivos";
+  return suffix;
+}
+function renderDocuments(){
+  const folders = docFolderDefinitionsV79();
+  const docsByFolder = new Map(folders.map(f => [f.folder, []]));
+  (data.documents || []).forEach(doc => {
+    const folder = docFolderForV79(doc);
+    if(!docsByFolder.has(folder)) docsByFolder.set(folder, []);
+    docsByFolder.get(folder).push(doc);
+  });
+  const stats = documentStatsV712();
+  const recent = [...(data.documents || [])].slice(-3).reverse();
+  byId("documentsList").innerHTML = `<div class="documents-focus-v712">
+    <div class="section-command-v712 docs-command-v712">
+      <div>
+        <span class="pill">Arquivos</span>
+        <h3>Documentos da viagem</h3>
+        <p>Envie arquivos pequenos pela Central. Para arquivos grandes, abra a subpasta do Drive e depois vincule o link.</p>
+      </div>
+      <button class="primary" data-new-doc-v712>+ Enviar documento</button>
+    </div>
+
+    <div class="quick-stats-v712" aria-label="Resumo dos documentos">
+      <span><strong>${stats.total}</strong> documento(s)</span>
+      <span><strong>${stats.drive}</strong> com link/Drive</span>
+      <span><strong>${stats.pending}</strong> pendente(s)</span>
+    </div>
+
+    <div class="doc-folder-strip-v712" aria-label="Pastas do Drive">
+      ${folders.map(f => {
+        const docs = docsByFolder.get(f.folder) || [];
+        return `<button type="button" class="doc-folder-chip-v712" data-doc-folder-jump="${escapeAttr(f.folder)}">
+          <span>${f.icon}</span>
+          <strong>${escapeHtml(f.folder.replace(/^\d+\s*-\s*/, ""))}</strong>
+          <small>${escapeHtml(docFolderSummaryV712(f.folder, docs))}</small>
+        </button>`;
+      }).join("")}
+    </div>
+
+    <div class="doc-list-toolbar-v712">
+      <div>
+        <h3>Arquivos cadastrados</h3>
+        <small>${stats.total ? "Consulta rápida dos documentos salvos ou pendentes." : "Nenhum documento cadastrado ainda."}</small>
+      </div>
+      <button class="secondary tiny" data-new-doc-v712>+ Documento</button>
+    </div>
+
+    <div class="doc-list-compact-v712">
+      ${(data.documents || []).length ? (data.documents || []).map(doc => {
+        const folder = docFolderForV79(doc);
+        const link = documentDriveUrlV710(doc);
+        return `<article class="doc-row-compact-v712" data-doc-row-folder="${escapeAttr(folder)}">
+          <div class="doc-file-icon-v712">📎</div>
+          <div class="doc-row-main-v712">
+            <strong>${escapeHtml(doc.title || doc.file?.name || "Documento da viagem")}</strong>
+            <small>${escapeHtml(folder)} · ${escapeHtml(dayLabel(doc.dayId))}</small>
+            <span>${escapeHtml(docStatusTextV79(doc))}</span>
+          </div>
+          <div class="doc-row-tags-v712">
+            <span class="tag blue">${escapeHtml(doc.category || "Documento")}</span>
+            <span class="tag ${doc.status === "Concluído" ? "ok" : "pending"}">${escapeHtml(doc.status || "Pendente")}</span>
+          </div>
+          <div class="doc-row-actions-v712">
+            ${link ? `<a class="primary tiny" href="${escapeAttr(link)}" target="_blank" rel="noopener">Abrir</a>` : ""}
+            <button class="ghost tiny" data-edit-doc="${doc.id}">Editar</button>
+            <button class="ghost tiny" data-open-drive-folder-doc="${doc.id}">Abrir pasta</button>
+            ${!link ? `<button class="ghost tiny" data-search-drive-doc="${doc.id}">Buscar no Drive</button><button class="ghost tiny" data-paste-drive-link="${doc.id}">Colar link</button>` : ""}
+            ${doc.file && doc.file.dataUrl && cloudConfigured() && !doc.driveFileId && !isLargeFileV710(doc.file) ? `<button class="ghost tiny" data-upload-drive="${doc.id}">Enviar Drive</button>` : ""}
+            ${doc.file && doc.file.dataUrl ? `<button class="ghost tiny" data-download-doc="${doc.id}">Baixar local</button>` : ""}
+            <button class="ghost tiny danger" data-delete-doc="${doc.id}">Excluir</button>
+          </div>
+        </article>`;
+      }).join("") : `<div class="empty-state compact-empty-v712">Nenhum documento cadastrado. Clique em <strong>+ Enviar documento</strong> para começar.</div>`}
+    </div>
+  </div>`;
+
+  document.querySelectorAll("[data-new-doc-v712]").forEach(el => el.onclick = () => openDocumentModal());
+  document.querySelectorAll("[data-doc-folder-jump]").forEach(el => el.onclick = () => {
+    const folder = el.dataset.docFolderJump;
+    const target = document.querySelector(`[data-doc-row-folder="${CSS.escape(folder)}"]`);
+    if(target){ target.scrollIntoView({ behavior:"smooth", block:"center" }); target.classList.add("pulse-v79"); setTimeout(() => target.classList.remove("pulse-v79"), 900); }
+    else showToast("Ainda não há arquivos nessa pasta");
+  });
+  document.querySelectorAll("[data-edit-doc]").forEach(el => el.onclick = () => openDocumentModal(data.documents.find(d => d.id === el.dataset.editDoc)));
+  document.querySelectorAll("[data-delete-doc]").forEach(el => el.onclick = () => deleteItem("documents", el.dataset.deleteDoc, "Excluir documento?"));
+  document.querySelectorAll("[data-download-doc]").forEach(el => el.onclick = () => downloadDocumentFile(el.dataset.downloadDoc));
+  document.querySelectorAll("[data-upload-drive]").forEach(el => el.onclick = () => uploadDocumentToDrive(el.dataset.uploadDrive));
+  document.querySelectorAll("[data-open-drive-folder-doc]").forEach(el => el.onclick = () => openDriveFolderForDocumentV710(el.dataset.openDriveFolderDoc));
+  document.querySelectorAll("[data-search-drive-doc]").forEach(el => el.onclick = () => searchRecentDriveFilesForDocumentV710(el.dataset.searchDriveDoc));
+  document.querySelectorAll("[data-paste-drive-link]").forEach(el => el.onclick = () => promptDriveLinkForDocumentV710(el.dataset.pasteDriveLink));
+}
+
+const renderAllBaseV712 = renderAll;
+renderAll = function(){
+  renderAllBaseV712();
+  applyFocusedShellV712(currentViewNameV712());
+};
+setTimeout(() => applyFocusedShellV712(currentViewNameV712()), 0);

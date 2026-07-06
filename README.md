@@ -1,19 +1,14 @@
-# Central de Viagem — v7.14 Período oficial corrigido
+# Central de Viagem — v7.15 Próximo dia navegável + documentos limpos
 
-Versão com correção de lógica do período da viagem.
+Versão focada em dois refinamentos de fluidez:
 
-## O que mudou
-
-- O campo **Editar viagem** passa a ser a fonte oficial do período.
-- O card **Período** mostra exatamente o início e fim definidos no modal.
-- Os dias do roteiro não sobrescrevem mais o período oficial.
-- Se houver dia fora do período oficial, a Central mostra alerta discreto, mas não altera o período.
-- Mantém todos os ajustes anteriores de navegação limpa, documentos, Drive e busca inteligente.
+- O card **Próximo dia** na Home agora é clicável e leva diretamente ao dia correspondente no Roteiro.
+- A aba **Documentos** ficou mais compacta: arquivos em linha limpa, ações secundárias agrupadas em **Mais** e filtros rápidos por documentos com link/pendentes.
 
 ## Como subir
 
-Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Aguarde o GitHub Pages atualizar e use Ctrl+F5.
+Envie todos os arquivos desta pasta para a raiz do repositório, substituindo os atuais. Depois aguarde o GitHub Pages atualizar e use Ctrl+F5.
 
 ## Apps Script
 
-Não precisa atualizar o Apps Script nesta versão.
+Não precisa alterar o Apps Script nesta versão, se ele já estiver funcionando com upload em subpastas do Drive.

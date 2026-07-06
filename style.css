@@ -1384,3 +1384,6 @@ body.home-exec-v713.view-overview-v712 .selected-place .card p{
   .priority-task-v713 em{grid-column:2;justify-self:start;}
   body.home-exec-v713.view-overview-v712 .dashboard-grid{grid-template-columns:1fr 1fr !important;}
 }
+
+/* v7.14 — aviso discreto no modal de período oficial */
+.inline-hint-v714{margin-top:14px;padding:12px 14px;border:1px dashed rgba(252,211,119,.32);border-radius:16px;color:#fcd377;background:rgba(252,211,119,.08);font-size:.92rem;line-height:1.35}

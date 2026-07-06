@@ -4551,3 +4551,115 @@ renderAll = function(){
   applyHomeShellV713(currentViewNameV712());
 };
 setTimeout(() => applyHomeShellV713(currentViewNameV712()), 0);
+
+/* ===== v7.14 — período oficial vem de Editar viagem =====
+   Correção: o card Período não deve ser recalculado pelos dias do roteiro
+   nem sobrescrito por normalizações antigas. O modal Editar viagem passa a
+   ser a fonte oficial do período exibido na Home e salvo na nuvem. */
+function canonicalizeDataSetV68(showNotice=false){
+  let changed = false;
+  const normalizeItemCity = item => {
+    if(!item || typeof item !== "object") return;
+    const before = item.city || "";
+    const after = canonicalizeCityV68(before);
+    if(before && after && before !== after){ item.city = after; changed = true; }
+    if(item.location && normalizeTextV68(item.location) === normalizeTextV68(before) && after && item.location !== after){ item.location = after; changed = true; }
+  };
+  (data.days || []).forEach(normalizeItemCity);
+  (data.places || []).forEach(place => {
+    normalizeItemCity(place);
+    if(place.city === "Aconcágua / Alta Montanha" && (!place.location || normalizeTextV68(place.location) === "aconcagua")){
+      place.location = "Parque Provincial Aconcágua, Mendoza";
+      changed = true;
+    }
+  });
+  (data.reservations || []).forEach(normalizeItemCity);
+  (data.expenses || []).forEach(normalizeItemCity);
+  if(changed){
+    saveData();
+    if(showNotice) showToast("Cidades normalizadas");
+  }
+  return changed;
+}
+function ensureOfficialPeriodFieldsV714(){
+  data.trip = data.trip || {};
+  const parsed = parsePeriodRangeV70(data.trip.period || "");
+  if(!data.trip.periodStart && parsed.start) data.trip.periodStart = parsed.start;
+  if(!data.trip.periodEnd && parsed.end) data.trip.periodEnd = parsed.end;
+  if((data.trip.periodStart || data.trip.periodEnd) && !data.trip.period){
+    data.trip.period = periodRangeFromInputsV70(toInputDateV70(data.trip.periodStart), toInputDateV70(data.trip.periodEnd), "");
+  }
+}
+function officialPeriodLabelV714(){
+  ensureOfficialPeriodFieldsV714();
+  const fromFields = periodRangeFromInputsV70(toInputDateV70(data.trip.periodStart), toInputDateV70(data.trip.periodEnd), "");
+  return fromFields || data.trip.period || "—";
+}
+function tripDateOutOfRangeWarningV714(){
+  ensureOfficialPeriodFieldsV714();
+  const start = parseDateParts(data.trip.periodStart);
+  const end = parseDateParts(data.trip.periodEnd);
+  if(!start || !end) return "";
+  const s = new Date(start.y, start.m - 1, start.d, 12).getTime();
+  const e = new Date(end.y, end.m - 1, end.d, 12).getTime();
+  const outside = (data.days || []).filter(day => {
+    const p = parseDateParts(day.date);
+    if(!p) return false;
+    const t = new Date(p.y, p.m - 1, p.d, 12).getTime();
+    return t < s || t > e;
+  });
+  return outside.length ? `${outside.length} dia(s) fora do período oficial` : "";
+}
+function renderMetrics(){
+  canonicalizeDataSetV68(false);
+  const openTasks = data.tasks.filter(t => !t.done);
+  const critical = openTasks.filter(t => t.critical);
+  const plannedPlaces = data.places.filter(p => p.dayId).length;
+  const expensesExpected = data.expenses.reduce((sum,e) => sum + Number(e.expected || 0), 0);
+  const reservationsExpected = data.reservations.reduce((sum,r) => sum + Number(r.amount || 0), 0);
+  const paid = data.expenses.reduce((sum,e) => sum + Number(e.paid || 0), 0) + data.reservations.reduce((sum,r) => sum + Number(r.paid || 0), 0);
+  const period = officialPeriodLabelV714();
+  data.trip.period = period !== "—" ? period : data.trip.period;
+  byId("metricPeriod").textContent = period;
+  const warn = tripDateOutOfRangeWarningV714();
+  byId("metricBase").textContent = warn ? `Base: ${data.trip.base || "—"} · ⚠️ ${warn}` : `Base: ${data.trip.base || "—"}`;
+  byId("metricPlaces").textContent = data.places.length;
+  byId("metricPlannedPlaces").textContent = `${plannedPlaces} vinculados ao roteiro`;
+  byId("metricOpenTasks").textContent = openTasks.length;
+  byId("metricCritical").textContent = `${critical.length} críticas`;
+  byId("metricBudget").textContent = formatCurrency(expensesExpected + reservationsExpected);
+  byId("metricPaid").textContent = `${formatCurrency(paid)} pago`;
+}
+function openTripModal(){
+  ensureOfficialPeriodFieldsV714();
+  const range = {
+    start: data.trip.periodStart || parsePeriodRangeV70(data.trip.period).start,
+    end: data.trip.periodEnd || parsePeriodRangeV70(data.trip.period).end
+  };
+  openModal("Editar dados da viagem", `<div class="form-grid form-grid-v70">
+    <div class="full">${input("title", "Título", data.trip.title)}</div>
+    <div class="full">${textarea("subtitle", "Descrição", data.trip.subtitle)}</div>
+    ${dateInputV70("periodStart", "Início da viagem", range.start)}
+    ${dateInputV70("periodEnd", "Fim da viagem", range.end)}
+    ${input("year", "Ano da viagem", data.trip.year || new Date().getFullYear(), "number", 'min="2020" max="2100"')}
+    ${input("base", "Base inicial", data.trip.base)}
+    <div class="full">${input("people", "Pessoas", data.trip.people)}</div>
+  </div>
+  <div class="inline-hint-v714">O período acima é a fonte oficial da viagem. Datas do roteiro fora desse intervalo geram alerta, mas não alteram o card Período.</div>`, fd => {
+    data.trip.title = fd.get("title").toString().trim();
+    data.trip.subtitle = fd.get("subtitle").toString().trim();
+    data.trip.periodStart = fromInputDateV70(fd.get("periodStart"));
+    data.trip.periodEnd = fromInputDateV70(fd.get("periodEnd"));
+    data.trip.period = periodRangeFromInputsV70(fd.get("periodStart"), fd.get("periodEnd"), data.trip.period);
+    data.trip.year = fd.get("year").toString().trim() || data.trip.year;
+    data.trip.base = fd.get("base").toString().trim();
+    data.trip.people = fd.get("people").toString().trim();
+    closeModal();
+    saveAndRender("Período da viagem atualizado");
+  });
+}
+const renderHeaderBaseV714 = renderHeader;
+renderHeader = function(){
+  ensureOfficialPeriodFieldsV714();
+  renderHeaderBaseV714();
+};
